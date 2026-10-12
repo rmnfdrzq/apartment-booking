@@ -7,24 +7,28 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
-from app.config import APP_DESCRIPTION, APP_TITLE, APP_VERSION
+from app.config import get_settings
 from app.database import Base, engine
+
+settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, Any]:
     """Application lifespan context manager for startup and shutdown tasks."""
-    # Startup: Ensure all database tables exist
+    # Ensure data directory exists on disk if using SQLite file
+    settings.ensure_data_dir()
+    # Initialize all database tables
     Base.metadata.create_all(bind=engine)
     yield
-    # Shutdown: Clean up resources if needed
+    # Dispose engine pools on server termination
     engine.dispose()
 
 
 app = FastAPI(
-    title=APP_TITLE,
-    description=APP_DESCRIPTION,
-    version=APP_VERSION,
+    title=settings.app_title,
+    description=settings.app_description,
+    version=settings.app_version,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -48,6 +52,6 @@ def health_check() -> dict[str, str]:
     """Return current API service status."""
     return {
         "status": "ok",
-        "app": APP_TITLE,
-        "version": APP_VERSION,
+        "app": settings.app_title,
+        "version": settings.app_version,
     }
