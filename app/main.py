@@ -1,11 +1,14 @@
 """FastAPI application entrypoint and lifespan management."""
 
+import math
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.config import get_settings
 from app.database import Base, engine
@@ -35,6 +38,31 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
+
+
+def _json_safe(value: Any) -> Any:
+    """Replace NaN/Infinity (not valid JSON) with strings so error bodies can be serialized."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Return 422 for invalid input, including payloads containing NaN or Infinity.
+
+    FastAPI's default handler echoes the rejected input back; with NaN/Infinity that
+    echo is not serializable and the client would get a 500 instead of a 422.
+    """
+    return JSONResponse(
+        status_code=422,
+        content={"detail": _json_safe(jsonable_encoder(exc.errors()))},
+    )
+
 
 app.include_router(apartments.router)
 app.include_router(bookings.router)
