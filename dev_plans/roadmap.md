@@ -173,17 +173,23 @@ flowchart TD
 ### Phase 4: Integration, Verification & Checkpoint 1 Delivery (Part 4)
 *Status: Final Verification*
 
-- [ ] **Step 4.1: End-to-End Demonstration Script (`scripts/demo.sh`)**
-  - Shell script with clean colored output executing the full user journey via `curl`:
-    1. Host creates 2 apartments.
-    2. Guest searches for dates $\to$ sees both apartments.
-    3. Guest books Apartment 1.
-    4. Second guest tries booking Apartment 1 on overlapping dates $\to$ asserts `409 Conflict`.
-    5. Second guest books Apartment 2 instead $\to$ succeeds.
-    6. Guest cancels booking on Apartment 1.
-    7. Search again $\to$ Apartment 1 is visible and free again.
+- [ ] **Step 4.1: Demonstration of the Working System (Two Options Available)**
+  - **Option 1: Automated End-to-End Demo Script (`scripts/demo.sh`)**
+    - Executable shell script with clean colorized terminal output executing the complete user journey and asserting HTTP codes:
+      1. Health check verification (`GET /health`).
+      2. Host lists 2 apartments (`POST /apartments`).
+      3. Guest searches availability for a target date range (`GET /apartments/search`).
+      4. Guest books Apartment 1 (`POST /bookings`).
+      5. Second guest attempts booking Apartment 1 on overlapping dates $\to$ asserts `409 Conflict`.
+      6. Second guest books Apartment 2 instead $\to$ asserts `201 Created`.
+      7. Guest updates booking dates / transfers apartment (`PUT /bookings/{id}`).
+      8. Guest cancels booking on Apartment 1 (`POST /bookings/{id}/cancel`).
+      9. Search again $\to$ Apartment 1 is free again.
+      10. Server restart & data persistence verification.
+  - **Option 2: Step-by-Step Manual cURL Walkthrough**
+    - Fully documented, copy-pasteable terminal instructions documented in `README.md` allowing the evaluator or developer to run each step interactively and inspect JSON responses.
 - [ ] **Step 4.2: Data Persistence Verification Test**
-  - Verify records remain in `./data/apartments.db` after stopping and restarting the server.
+  - Verify records remain in `./data/apartments.db` after stopping and restarting the server (both automated in script and documented manually).
 - [ ] **Step 4.3: Interactive Swagger Verification**
   - Verify `/docs` schema, tags, and documentation descriptions.
 - [ ] **Step 4.4: Checkpoint 1 Sign-Off**
