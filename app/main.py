@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse
 
 from app.config import get_settings
 from app.database import Base, engine
+from app.routers import bookings
 
 settings = get_settings()
 
@@ -34,6 +35,8 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
+
+app.include_router(bookings.router)
 
 
 @app.get("/", include_in_schema=False)
