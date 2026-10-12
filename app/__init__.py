@@ -1,0 +1,1 @@
+"""Apartment Booking API package."""
