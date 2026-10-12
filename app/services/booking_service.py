@@ -88,12 +88,17 @@ def get_booking_by_id(db: Session, booking_id: str) -> Optional[Booking]:
     return db.query(Booking).filter(Booking.id == booking_id).first()
 
 
-def get_all_bookings(db: Session, apartment_id: Optional[str] = None) -> List[Booking]:
-    """Retrieve all bookings, optionally filtered by apartment ID."""
+def get_all_bookings(
+    db: Session,
+    apartment_id: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[Booking]:
+    """Retrieve all bookings with pagination, optionally filtered by apartment ID."""
     query = db.query(Booking)
     if apartment_id:
         query = query.filter(Booking.apartment_id == apartment_id)
-    return query.order_by(Booking.start_date.asc()).all()
+    return query.order_by(Booking.start_date.asc()).offset(offset).limit(limit).all()
 
 
 def update_booking(db: Session, booking_id: str, data: BookingUpdate) -> Booking:
@@ -105,7 +110,14 @@ def update_booking(db: Session, booking_id: str, data: BookingUpdate) -> Booking
             detail=f"Booking with ID '{booking_id}' not found.",
         )
 
-    # Resolve target apartment and dates
+    # 1. Forbid modification of cancelled bookings
+    if booking.status == BookingStatus.CANCELLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot modify a cancelled booking.",
+        )
+
+    # 2. Resolve target apartment and dates
     target_apartment_id = data.apartment_id or booking.apartment_id
     target_start_date = data.start_date or booking.start_date
     target_end_date = data.end_date or booking.end_date
@@ -132,7 +144,7 @@ def update_booking(db: Session, booking_id: str, data: BookingUpdate) -> Booking
         or target_end_date != booking.end_date
     )
 
-    if dates_or_apartment_changed and booking.status == BookingStatus.CONFIRMED:
+    if dates_or_apartment_changed:
         # If staying in same apartment, exclude self from collision check
         exclude_id = booking.id if target_apartment_id == booking.apartment_id else None
         if check_date_overlap(
@@ -177,7 +189,9 @@ def cancel_booking(db: Session, booking_id: str) -> Booking:
             detail=f"Booking with ID '{booking_id}' not found.",
         )
 
-    booking.status = BookingStatus.CANCELLED
-    db.commit()
-    db.refresh(booking)
+    if booking.status != BookingStatus.CANCELLED:
+        booking.status = BookingStatus.CANCELLED
+        db.commit()
+        db.refresh(booking)
+
     return booking

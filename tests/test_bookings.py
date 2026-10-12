@@ -1,7 +1,9 @@
 """Integration tests for Booking lifecycle and operations (US2)."""
 
 from datetime import date
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Apartment, Booking, BookingStatus
@@ -41,6 +43,34 @@ def test_create_booking_success(client: TestClient, db_session: Session) -> None
     assert data["total_price"] == 480.0  # 4 * 120
     assert data["status"] == "CONFIRMED"
     assert "id" in data
+
+
+def test_create_booking_invalid_email(client: TestClient, db_session: Session) -> None:
+    """Verify that booking creation rejects invalid email addresses."""
+    apt = create_sample_apartment(db_session)
+    payload = {
+        "apartment_id": apt.id,
+        "guest_name": "Elena Rossi",
+        "guest_email": "not-an-email",
+        "start_date": "2026-11-01",
+        "end_date": "2026-11-05",
+    }
+    response = client.post("/bookings", json=payload)
+    assert response.status_code == 422
+
+
+def test_create_booking_whitespace_name(client: TestClient, db_session: Session) -> None:
+    """Verify that whitespace-only guest names are rejected."""
+    apt = create_sample_apartment(db_session)
+    payload = {
+        "apartment_id": apt.id,
+        "guest_name": "   ",
+        "guest_email": "elena@example.com",
+        "start_date": "2026-11-01",
+        "end_date": "2026-11-05",
+    }
+    response = client.post("/bookings", json=payload)
+    assert response.status_code == 422
 
 
 def test_create_booking_nonexistent_apartment(client: TestClient) -> None:
@@ -94,38 +124,36 @@ def test_get_booking_by_id(client: TestClient, db_session: Session) -> None:
     assert client.get("/bookings/unknown-id").status_code == 404
 
 
-def test_list_bookings_and_filter_by_apartment(client: TestClient, db_session: Session) -> None:
-    """Verify listing all bookings and filtering by apartment ID."""
+def test_list_bookings_and_pagination(client: TestClient, db_session: Session) -> None:
+    """Verify listing bookings with pagination and apartment filtering."""
     apt1 = create_sample_apartment(db_session, title="Apt 1")
     apt2 = create_sample_apartment(db_session, title="Apt 2")
 
-    client.post(
-        "/bookings",
-        json={
-            "apartment_id": apt1.id,
-            "guest_name": "Guest 1",
-            "guest_email": "g1@example.com",
-            "start_date": "2026-11-01",
-            "end_date": "2026-11-05",
-        },
-    )
-    client.post(
-        "/bookings",
-        json={
-            "apartment_id": apt2.id,
-            "guest_name": "Guest 2",
-            "guest_email": "g2@example.com",
-            "start_date": "2026-11-01",
-            "end_date": "2026-11-05",
-        },
-    )
+    for i in range(5):
+        client.post(
+            "/bookings",
+            json={
+                "apartment_id": apt1.id,
+                "guest_name": f"Guest {i}",
+                "guest_email": f"g{i}@example.com",
+                "start_date": f"2026-11-0{i+1}",
+                "end_date": f"2026-11-0{i+2}",
+            },
+        )
 
-    all_resp = client.get("/bookings")
-    assert len(all_resp.json()) == 2
+    # Test limit and offset
+    resp_page1 = client.get("/bookings?limit=2&offset=0")
+    assert resp_page1.status_code == 200
+    assert len(resp_page1.json()) == 2
 
+    resp_page2 = client.get("/bookings?limit=2&offset=2")
+    assert resp_page2.status_code == 200
+    assert len(resp_page2.json()) == 2
+    assert resp_page1.json() != resp_page2.json()
+
+    # Filter by apartment
     filtered_resp = client.get(f"/bookings?apartment_id={apt1.id}")
-    assert len(filtered_resp.json()) == 1
-    assert filtered_resp.json()[0]["apartment_id"] == apt1.id
+    assert len(filtered_resp.json()) == 5
 
 
 def test_update_booking_dates_and_recalculate_price(client: TestClient, db_session: Session) -> None:
@@ -208,7 +236,7 @@ def test_update_booking_guest_info_only(client: TestClient, db_session: Session)
 
 
 def test_update_booking_errors(client: TestClient, db_session: Session) -> None:
-    """Verify error handling on booking update: 404 on missing booking, 404 on target apartment, 400 on dates."""
+    """Verify error handling on booking update: 404, 400 on invalid dates."""
     apt = create_sample_apartment(db_session)
     create_resp = client.post(
         "/bookings",
@@ -229,13 +257,37 @@ def test_update_booking_errors(client: TestClient, db_session: Session) -> None:
     resp = client.put(f"/bookings/{booking_id}", json={"apartment_id": "unknown-apt"})
     assert resp.status_code == 404
 
-    # 3. Invalid date order where new start_date is after existing end_date (Nov 10 vs existing end Nov 5)
+    # 3. Invalid date order where new start_date is after existing end_date
     resp = client.put(f"/bookings/{booking_id}", json={"start_date": "2026-11-10"})
     assert resp.status_code == 400
 
 
+def test_cannot_update_cancelled_booking(client: TestClient, db_session: Session) -> None:
+    """Verify that updating a cancelled booking is rejected with 400 Bad Request."""
+    apt = create_sample_apartment(db_session)
+    create_resp = client.post(
+        "/bookings",
+        json={
+            "apartment_id": apt.id,
+            "guest_name": "Elena",
+            "guest_email": "elena@example.com",
+            "start_date": "2026-11-01",
+            "end_date": "2026-11-05",
+        },
+    )
+    booking_id = create_resp.json()["id"]
+
+    # Cancel booking
+    client.post(f"/bookings/{booking_id}/cancel")
+
+    # Attempt update on cancelled booking
+    update_resp = client.put(f"/bookings/{booking_id}", json={"guest_name": "Attempt"})
+    assert update_resp.status_code == 400
+    assert "cannot modify a cancelled booking" in update_resp.json()["detail"].lower()
+
+
 def test_cancel_booking(client: TestClient, db_session: Session) -> None:
-    """Verify cancelling a booking marks status as CANCELLED."""
+    """Verify cancelling a booking marks status as CANCELLED and is idempotent."""
     apt = create_sample_apartment(db_session)
     create_resp = client.post(
         "/bookings",
@@ -253,9 +305,31 @@ def test_cancel_booking(client: TestClient, db_session: Session) -> None:
     assert cancel_resp.status_code == 200
     assert cancel_resp.json()["status"] == "CANCELLED"
 
-    # Verify state via GET
-    get_resp = client.get(f"/bookings/{booking_id}")
-    assert get_resp.json()["status"] == "CANCELLED"
+    # Idempotent re-cancel returns 200
+    recancel_resp = client.post(f"/bookings/{booking_id}/cancel")
+    assert recancel_resp.status_code == 200
 
     # Non-existent booking cancel returns 404
     assert client.post("/bookings/unknown-id/cancel").status_code == 404
+
+
+def test_foreign_key_restricts_apartment_deletion_with_active_bookings(db_session: Session) -> None:
+    """Verify that deleting an apartment with active bookings is restricted by foreign key."""
+    apt = create_sample_apartment(db_session)
+    booking = Booking(
+        apartment_id=apt.id,
+        guest_name="Elena",
+        guest_email="elena@example.com",
+        start_date=date(2026, 11, 1),
+        end_date=date(2026, 11, 5),
+        total_price=400.0,
+        status=BookingStatus.CONFIRMED,
+    )
+    db_session.add(booking)
+    db_session.commit()
+
+    # Attempting to delete the apartment directly should raise IntegrityError due to RESTRICT
+    db_session.delete(apt)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()

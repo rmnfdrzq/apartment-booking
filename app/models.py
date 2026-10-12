@@ -5,7 +5,7 @@ import uuid
 from datetime import date, datetime
 from typing import List, Optional
 
-from sqlalchemy import Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Date, DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -39,11 +39,11 @@ class Apartment(Base):
         nullable=False,
     )
 
-    # Relationships
+    # Relationships: Deletion of apartments with active bookings is RESTRICTED
     bookings: Mapped[List["Booking"]] = relationship(
         "Booking",
         back_populates="apartment",
-        cascade="all, delete-orphan",
+        passive_deletes="all",
     )
 
 
@@ -51,6 +51,16 @@ class Booking(Base):
     """Guest stay reservation for an apartment."""
 
     __tablename__ = "bookings"
+    __table_args__ = (
+        # High-performance composite index for date overlap queries
+        Index(
+            "ix_bookings_apartment_status_dates",
+            "apartment_id",
+            "status",
+            "start_date",
+            "end_date",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36),
@@ -59,7 +69,7 @@ class Booking(Base):
     )
     apartment_id: Mapped[str] = mapped_column(
         String(36),
-        ForeignKey("apartments.id", ondelete="CASCADE"),
+        ForeignKey("apartments.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )

@@ -7,6 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models import BookingStatus
 
+# Common email regex pattern to validate format without external dependencies
+EMAIL_REGEX = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+
 
 # -----------------------------------------------------------------------------
 # Apartment Schemas (Contract-First Definition)
@@ -15,6 +18,8 @@ from app.models import BookingStatus
 
 class ApartmentBase(BaseModel):
     """Base fields for apartment listings."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
 
     title: str = Field(..., min_length=1, max_length=255, description="Apartment listing title")
     description: Optional[str] = Field(None, description="Detailed description of the apartment")
@@ -32,6 +37,8 @@ class ApartmentCreate(ApartmentBase):
 class ApartmentUpdate(BaseModel):
     """Payload for updating an existing apartment listing."""
 
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     address: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -45,7 +52,7 @@ class ApartmentResponse(ApartmentBase):
     id: str
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
 
 
 # -----------------------------------------------------------------------------
@@ -56,8 +63,14 @@ class ApartmentResponse(ApartmentBase):
 class BookingBase(BaseModel):
     """Base fields for bookings."""
 
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     guest_name: str = Field(..., min_length=1, max_length=255, description="Full name of the guest")
-    guest_email: str = Field(..., min_length=3, max_length=255, description="Contact email of the guest")
+    guest_email: str = Field(
+        ...,
+        pattern=EMAIL_REGEX,
+        description="Valid contact email of the guest",
+    )
     start_date: date = Field(..., description="Check-in date (inclusive)")
     end_date: date = Field(..., description="Check-out date (exclusive)")
 
@@ -78,9 +91,11 @@ class BookingCreate(BookingBase):
 class BookingUpdate(BaseModel):
     """Payload for updating an existing booking."""
 
-    apartment_id: Optional[str] = Field(None, description="Move booking to a different apartment ID")
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    apartment_id: Optional[str] = Field(None, min_length=1, description="Move booking to a different apartment ID")
     guest_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    guest_email: Optional[str] = Field(None, min_length=3, max_length=255)
+    guest_email: Optional[str] = Field(None, pattern=EMAIL_REGEX)
     start_date: Optional[date] = None
     end_date: Optional[date] = None
 
@@ -106,4 +121,4 @@ class BookingResponse(BaseModel):
     status: BookingStatus
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)

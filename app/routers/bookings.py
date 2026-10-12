@@ -34,14 +34,16 @@ def create_booking(
     "",
     response_model=List[BookingResponse],
     summary="List all bookings",
-    description="Retrieve all bookings, optionally filtered by apartment ID.",
+    description="Retrieve all bookings with pagination, optionally filtered by apartment ID.",
 )
 def list_bookings(
     apartment_id: Optional[str] = Query(None, description="Filter by apartment ID"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of bookings to return"),
+    offset: int = Query(0, ge=0, description="Offset for pagination"),
     db: Session = Depends(get_db),
 ) -> List[BookingResponse]:
-    """List bookings."""
-    return booking_service.get_all_bookings(db, apartment_id=apartment_id)
+    """List bookings with pagination."""
+    return booking_service.get_all_bookings(db, apartment_id=apartment_id, limit=limit, offset=offset)
 
 
 @router.get(
