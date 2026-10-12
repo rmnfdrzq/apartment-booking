@@ -221,3 +221,41 @@ def test_delete_apartment_concurrent_active_booking_rolls_back(
     assert db_session.get(Apartment, apt.id) is not None
     remaining = {b.id for b in db_session.scalars(select(Booking)).all()}
     assert remaining == {active.id, cancelled.id}
+
+
+def test_booking_for_concurrently_deleted_apartment_returns_404(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Deleting an apartment between booking validation and insert must not cause a 500."""
+    from app.schemas import BookingCreate
+    from app.services import booking_service
+    from tests.conftest import TestingSessionLocal
+
+    apt = make_apartment(db_session)
+    apt_id = apt.id
+    real_overlap_check = booking_service.check_date_overlap
+
+    def delete_then_check(*args: object, **kwargs: object) -> bool:
+        other_request = TestingSessionLocal()
+        try:
+            apartment_service.delete_apartment(other_request, apt_id, today=TODAY)
+        finally:
+            other_request.close()
+        return real_overlap_check(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(booking_service, "check_date_overlap", delete_then_check)
+
+    with pytest.raises(HTTPException) as exc_info:
+        booking_service.create_booking(
+            db_session,
+            BookingCreate(
+                apartment_id=apt_id,
+                guest_name="Ona",
+                guest_email="ona@example.com",
+                start_date=date(2026, 11, 1),
+                end_date=date(2026, 11, 3),
+            ),
+        )
+
+    assert exc_info.value.status_code == 404
+    assert db_session.scalars(select(Booking)).all() == []
