@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse
 
 from app.config import get_settings
 from app.database import Base, engine
-from app.routers import bookings
+from app.routers import apartments, bookings
 
 settings = get_settings()
 
@@ -36,6 +36,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(apartments.router)
 app.include_router(bookings.router)
 
 
