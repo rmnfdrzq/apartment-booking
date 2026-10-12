@@ -4,6 +4,7 @@ from datetime import date
 from typing import List, Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Apartment, Booking, BookingStatus
@@ -34,6 +35,21 @@ def check_date_overlap(
         query = query.filter(Booking.id != exclude_booking_id)
 
     return query.first() is not None
+
+
+def _commit_booking(db: Session, apartment_id: str) -> None:
+    """Commit booking changes; the apartment may have been deleted by a concurrent request.
+
+    The existence check runs before the write, so the foreign key is the final guard.
+    """
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Apartment with ID '{apartment_id}' not found.",
+        ) from None
 
 
 def create_booking(db: Session, data: BookingCreate) -> Booking:
@@ -78,7 +94,7 @@ def create_booking(db: Session, data: BookingCreate) -> Booking:
         status=BookingStatus.CONFIRMED,
     )
     db.add(booking)
-    db.commit()
+    _commit_booking(db, data.apartment_id)
     db.refresh(booking)
     return booking
 
@@ -175,7 +191,7 @@ def update_booking(db: Session, booking_id: str, data: BookingUpdate) -> Booking
         nights = (target_end_date - target_start_date).days
         booking.total_price = round(nights * target_apartment.price_per_night, 2)
 
-    db.commit()
+    _commit_booking(db, target_apartment_id)
     db.refresh(booking)
     return booking
 

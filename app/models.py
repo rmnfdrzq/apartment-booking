@@ -22,6 +22,10 @@ class Apartment(Base):
     """Apartment property listing available for rental."""
 
     __tablename__ = "apartments"
+    __table_args__ = (
+        # Supports the stable ordering used by paginated GET /apartments
+        Index("ix_apartments_created_at_id", "created_at", "id"),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36),
