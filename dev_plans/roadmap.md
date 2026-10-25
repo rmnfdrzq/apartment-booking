@@ -65,14 +65,14 @@ flowchart TD
 ### Phase 1: Shared Foundation (Part 0)
 *Status: Sequential — 1 Developer (~45 minutes)*
 
-- [ ] **Step 0.1: Dependencies & Environment**
+- [x] **Step 0.1: Dependencies & Environment**
   - Create `requirements.txt` with: `fastapi`, `uvicorn[standard]`, `sqlalchemy`, `pydantic`, `pytest`, `httpx`, `pytest-cov`.
-- [ ] **Step 0.2: SQLite Engine & Session Lifecycle**
+- [x] **Step 0.2: SQLite Engine & Session Lifecycle**
   - Create `app/config.py` (database path `./data/apartments.db`).
   - Create `app/database.py` with SQLAlchemy `create_engine` (SQLite with `check_same_thread=False`), `sessionmaker`, and declarative `Base`.
-- [ ] **Step 0.3: FastAPI Shell & Lifespan Setup**
+- [x] **Step 0.3: FastAPI Shell & Lifespan Setup**
   - Create `app/main.py` initializing the FastAPI app, registering a `/health` endpoint, and creating tables on startup.
-- [ ] **Step 0.4: Pytest Harness with In-Memory Database**
+- [x] **Step 0.4: Pytest Harness with In-Memory Database**
   - Create `tests/conftest.py` with fixtures for an isolated in-memory SQLite database (`sqlite:///:memory:`) and `httpx.AsyncClient` / `TestClient`.
   - Add smoke test `tests/test_health.py` to confirm the pipeline works.
 
@@ -84,7 +84,7 @@ flowchart TD
 *Status: Can be built simultaneously on separate git branches (`feature/apartments` and `feature/bookings`)*
 
 #### Track A: Part 1 — Apartment Catalog Subsystem (US1)
-- [ ] **Step 1.1: Database Model & Schemas**
+- [x] **Step 1.1: Database Model & Schemas**
   - Model `Apartment` in `app/models.py`:
     - `id` (UUID string, PK)
     - `title` (str, required)
@@ -94,27 +94,27 @@ flowchart TD
     - `max_guests` (int, > 0)
     - `created_at` (datetime)
   - Pydantic schemas in `app/schemas.py`: `ApartmentCreate`, `ApartmentUpdate`, `ApartmentResponse`.
-- [ ] **Step 1.2: Apartment Service (TDD)**
+- [x] **Step 1.2: Apartment Service (TDD)**
   - Implement business logic in `app/services/apartment_service.py`:
     - `create_apartment(db, data)`
     - `get_apartments(db)`
     - `get_apartment_by_id(db, id)`
     - `update_apartment(db, id, data)`
     - `delete_apartment(db, id)`
-- [ ] **Step 1.3: Apartment Router**
+- [x] **Step 1.3: Apartment Router**
   - Implement `app/routers/apartments.py`:
     - `POST /apartments` $\to$ `201 Created`
     - `GET /apartments` $\to$ `200 OK`
     - `GET /apartments/{id}` $\to$ `200 OK` (or `404 Not Found`)
     - `PUT /apartments/{id}` $\to$ `200 OK` (or `404 Not Found`)
     - `DELETE /apartments/{id}` $\to$ `204 No Content` (or `404 Not Found`)
-- [ ] **Step 1.4: Tests (`tests/test_apartments.py`)**
+- [x] **Step 1.4: Tests (`tests/test_apartments.py`)**
   - Test all CRUD operations and validation errors (e.g., negative price returns `422 Unprocessable Entity`).
 
 ---
 
 #### Track B: Part 2 — Booking Lifecycle & Overlap Engine (US2 & US4)
-- [ ] **Step 2.1: Booking Model & Enums**
+- [x] **Step 2.1: Booking Model & Enums**
   - Enum `BookingStatus` (`CONFIRMED`, `CANCELLED`).
   - Model `Booking` in `app/models.py`:
     - `id` (UUID string, PK)
@@ -127,18 +127,18 @@ flowchart TD
     - `status` (BookingStatus, default: `CONFIRMED`)
     - `created_at` (datetime)
   - Schemas in `app/schemas.py`: `BookingCreate`, `BookingUpdate`, `BookingResponse`.
-- [ ] **Step 2.2: Overlap Prevention Business Logic (Pure Domain Function)**
+- [x] **Step 2.2: Overlap Prevention Business Logic (Pure Domain Function)**
   - Implement interval check:
     $$\text{Existing.start} < \text{Requested.end} \quad \text{AND} \quad \text{Existing.end} > \text{Requested.start}$$
   - Ignore bookings where `status == CANCELLED`.
   - Exclude the current booking when evaluating date updates on an existing booking.
-- [ ] **Step 2.3: Booking Service & Endpoints**
+- [x] **Step 2.3: Booking Service & Endpoints**
   - Implement `app/services/booking_service.py` & `app/routers/bookings.py`:
     - `POST /bookings` $\to$ `201 Created` on success, `409 Conflict` on overlap, `404` if apartment missing.
     - `GET /bookings` & `GET /bookings/{id}` $\to$ `200 OK`.
     - `PUT /bookings/{id}` $\to$ `200 OK` (re-validates overlap if dates change).
     - `POST /bookings/{id}/cancel` $\to$ sets status to `CANCELLED`, freeing the dates.
-- [ ] **Step 2.4: Comprehensive Collision Tests (`tests/test_bookings.py` & `tests/test_overlap.py`)**
+- [x] **Step 2.4: Comprehensive Collision Tests (`tests/test_bookings.py` & `tests/test_overlap.py`)**
   - Test exact date collision.
   - Test overlapping start date or end date.
   - Test enclosing date range.
@@ -150,7 +150,7 @@ flowchart TD
 ### Phase 3: Cross-Entity Features (Part 3)
 *Status: Sequential — Requires Parts 1 & 2 models to be merged*
 
-- [ ] **Step 3.1: Date Range Availability Search Service (US3)**
+- [x] **Step 3.1: Date Range Availability Search Service (US3)**
   - Add search logic to find apartments having **no active overlapping bookings**:
     ```sql
     SELECT * FROM apartments WHERE id NOT IN (
@@ -160,10 +160,10 @@ flowchart TD
           AND end_date > :search_start
     );
     ```
-- [ ] **Step 3.2: Search Endpoint**
+- [x] **Step 3.2: Search Endpoint**
   - Endpoint: `GET /apartments/search?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`.
   - Input validation: reject queries where `start_date >= end_date` with `400 Bad Request`.
-- [ ] **Step 3.3: Tests (`tests/test_search.py`)**
+- [x] **Step 3.3: Tests (`tests/test_search.py`)**
   - Verify that only available apartments are returned.
   - Verify that booked apartments are excluded.
   - Verify that apartments with cancelled bookings are included.

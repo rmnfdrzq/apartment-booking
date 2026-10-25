@@ -1,5 +1,6 @@
-"""REST router for the apartment catalog (US1)."""
+"""REST router for the apartment catalog (US1) and availability search (US3)."""
 
+from datetime import date
 from typing import Any, Dict, List, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -19,7 +20,7 @@ NOT_FOUND_RESPONSE: Dict[Union[int, str], Dict[str, Any]] = {
     status.HTTP_404_NOT_FOUND: {"description": "Apartment not found"},
 }
 
-# NOTE (Part 3): declare GET /apartments/search ABOVE the /{apartment_id} routes,
+# Keep GET /apartments/search ABOVE the /{apartment_id} routes,
 # otherwise "search" is matched as an apartment ID.
 
 
@@ -51,6 +52,30 @@ def list_apartments(
 ) -> List[Apartment]:
     """List apartments with pagination."""
     return apartment_service.get_apartments(db, limit=limit, offset=offset)
+
+
+@router.get(
+    "/search",
+    response_model=List[ApartmentResponse],
+    summary="Search available apartments",
+    description=(
+        "Find apartments with no confirmed booking overlapping the stay "
+        "[start_date, end_date). Check-in on another guest's check-out day is allowed, "
+        "and cancelled bookings never block an apartment."
+    ),
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"description": "start_date is not strictly before end_date"},
+    },
+)
+def search_apartments(
+    start_date: date = Query(..., description="Check-in date (inclusive), YYYY-MM-DD"),
+    end_date: date = Query(..., description="Check-out date (exclusive), YYYY-MM-DD"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum number of apartments to return"),
+    offset: int = Query(0, ge=0, description="Number of apartments to skip"),
+    db: Session = Depends(get_db),
+) -> List[Apartment]:
+    """Search apartments available for the whole date range."""
+    return apartment_service.search_available_apartments(db, start_date, end_date, limit=limit, offset=offset)
 
 
 @router.get(

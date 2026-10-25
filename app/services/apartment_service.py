@@ -1,15 +1,16 @@
-"""Business logic for the apartment catalog (US1)."""
+"""Business logic for the apartment catalog (US1) and availability search (US3)."""
 
 from datetime import date
 from typing import List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Apartment, Booking, BookingStatus
 from app.schemas import ApartmentCreate, ApartmentUpdate
+from app.services.booking_service import active_overlap_condition
 
 
 def _not_found(apartment_id: str) -> HTTPException:
@@ -46,9 +47,38 @@ def create_apartment(db: Session, data: ApartmentCreate) -> Apartment:
     return apartment
 
 
+CATALOG_ORDER = (Apartment.created_at.asc(), Apartment.id.asc())
+
+
 def get_apartments(db: Session, limit: int = 100, offset: int = 0) -> List[Apartment]:
     """Return a page of apartments in stable creation order."""
-    statement = select(Apartment).order_by(Apartment.created_at.asc(), Apartment.id.asc()).offset(offset).limit(limit)
+    statement = select(Apartment).order_by(*CATALOG_ORDER).offset(offset).limit(limit)
+    return list(db.scalars(statement).all())
+
+
+def search_available_apartments(
+    db: Session,
+    start_date: date,
+    end_date: date,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[Apartment]:
+    """Return apartments with no confirmed booking overlapping the stay [start_date, end_date).
+
+    Uses the same overlap rule as booking creation, so every apartment returned here
+    can be booked for these dates (unless someone else books it first).
+    """
+    if start_date >= end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Check-in date (start_date) must be strictly before check-out date (end_date).",
+        )
+
+    has_overlapping_booking = exists().where(
+        Booking.apartment_id == Apartment.id,
+        active_overlap_condition(start_date, end_date),
+    )
+    statement = select(Apartment).where(~has_overlapping_booking).order_by(*CATALOG_ORDER).offset(offset).limit(limit)
     return list(db.scalars(statement).all())
 
 

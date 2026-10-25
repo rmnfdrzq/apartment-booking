@@ -4,11 +4,25 @@ from datetime import date
 from typing import List, Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy import ColumnElement, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Apartment, Booking, BookingStatus
 from app.schemas import BookingCreate, BookingUpdate
+
+
+def active_overlap_condition(start_date: date, end_date: date) -> ColumnElement[bool]:
+    """SQL condition matching confirmed bookings that overlap the stay [start_date, end_date).
+
+    Single source of truth for the overlap rule, shared by overlap prevention (US4)
+    and availability search (US3) so the two can never disagree.
+    """
+    return and_(
+        Booking.status == BookingStatus.CONFIRMED,
+        Booking.start_date < end_date,
+        Booking.end_date > start_date,
+    )
 
 
 def check_date_overlap(
@@ -27,9 +41,7 @@ def check_date_overlap(
     """
     query = db.query(Booking).filter(
         Booking.apartment_id == apartment_id,
-        Booking.status == BookingStatus.CONFIRMED,
-        Booking.start_date < end_date,
-        Booking.end_date > start_date,
+        active_overlap_condition(start_date, end_date),
     )
     if exclude_booking_id:
         query = query.filter(Booking.id != exclude_booking_id)
