@@ -73,14 +73,16 @@ fail() {
 
 # --- python helpers (JSON, dates, ports) -----------------------------------------
 
-# Evaluate a Python expression on the last JSON response, available as `d`.
+# json EXPR [ARG...]: evaluate a Python expression on the last JSON response.
+# The response is available as `d`, extra arguments as `a` (a list of strings).
+# Values from the server are only ever passed as data, never inserted into EXPR.
 json() {
     printf '%s' "$RESP_BODY" | "$PY" -I -c '
 import json, sys
 d = json.load(sys.stdin)
-v = eval(sys.argv[1], {"d": d})
+v = eval(sys.argv[1], {"__builtins__": {"all": all, "any": any, "len": len}, "d": d, "a": sys.argv[2:]})
 print(json.dumps(v) if isinstance(v, (bool, list, dict)) or v is None else v)
-' "$1"
+' "$@"
 }
 
 # ISO date N days from today, e.g. day 30 -> 2026-11-24
@@ -166,7 +168,8 @@ cleanup() {
     rm -rf "$TMP_DIR"
 }
 trap cleanup EXIT
-trap 'exit 130' INT TERM
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # --- preflight ---------------------------------------------------------------------
 
@@ -227,7 +230,7 @@ check "price updated" "$(json 'd["price_per_night"]')" "120.0"
 
 request GET /apartments
 expect_status 200 "GET /apartments"
-check "both apartments are listed" "$(json "all(i in [a['id'] for a in d] for i in ['$APT1', '$APT2'])")" "true"
+check "both apartments are listed" "$(json 'all(i in [x["id"] for x in d] for i in a)' "$APT1" "$APT2")" "true"
 
 request GET "/apartments/$APT1"
 expect_status 200 "GET /apartments/{id}"
@@ -237,7 +240,7 @@ expect_status 200 "GET /apartments/{id}"
 step "3. Guest searches for available apartments (US3)"
 request GET "$SEARCH"
 expect_status 200 "GET /apartments/search $D30 → $D34"
-check "both apartments are available" "$(json "all(i in [a['id'] for a in d] for i in ['$APT1', '$APT2'])")" "true"
+check "both apartments are available" "$(json 'all(i in [x["id"] for x in d] for i in a)' "$APT1" "$APT2")" "true"
 
 request GET "/apartments/search?start_date=$D34&end_date=$D30"
 expect_status 400 "search with check-out before check-in is rejected"
@@ -252,7 +255,7 @@ check "total price = 4 nights × 120" "$(json 'd["total_price"]')" "480.0"
 check "booking is CONFIRMED" "$(json 'd["status"]')" "CONFIRMED"
 
 request GET "$SEARCH"
-check "Sunny Alpine Studio no longer shows up in search" "$(json "'$APT1' in [a['id'] for a in d]")" "false"
+check "Sunny Alpine Studio no longer shows up in search" "$(json 'a[0] in [x["id"] for x in d]' "$APT1")" "false"
 
 # --- 5. overlap prevention (US4) ---------------------------------------------------
 
@@ -299,8 +302,8 @@ check "booking is CANCELLED" "$(json 'd["status"]')" "CANCELLED"
 step "9. Search again: Sunny Alpine Studio is free again (US3)"
 request GET "$SEARCH"
 expect_status 200 "GET /apartments/search $D30 → $D34"
-check "Sunny Alpine Studio is available" "$(json "'$APT1' in [a['id'] for a in d]")" "true"
-check "City Loft is not available (Bob's stay)" "$(json "'$APT2' in [a['id'] for a in d]")" "false"
+check "Sunny Alpine Studio is available" "$(json 'a[0] in [x["id"] for x in d]' "$APT1")" "true"
+check "City Loft is not available (Bob's stay)" "$(json 'a[0] in [x["id"] for x in d]' "$APT2")" "false"
 
 # --- 10. persistence ---------------------------------------------------------------
 

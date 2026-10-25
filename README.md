@@ -308,7 +308,7 @@ Every step asserts the HTTP status code and key response values. Each check prin
 
 Dates are calculated relative to today, so the demo never goes out of date.
 
-**Against a server you already started** (e.g. to watch requests in its log), pass its URL. The restart step is then skipped, and the demo removes the data it created at the end:
+**Against a server you already started** (e.g. to watch requests in its log), pass its URL. The restart step is then skipped, and the demo removes the data it created at the end (if a check fails midway, the records created so far stay in that server's database):
 ```bash
 BASE_URL=http://127.0.0.1:8000 ./scripts/demo.sh
 ```
