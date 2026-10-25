@@ -195,7 +195,9 @@ apartment-booking/
 ├── dev_plans/
 │   ├── roadmap.md          # Multi-phase development roadmap & dependency graph
 │   ├── part0-scaffold/plan.md # Plan for initial setup & test harness
-│   └── part2-bookings/plan.md # Plan for booking lifecycle & overlap engine
+│   ├── part1-apartments/plan.md # Plan for apartment catalog CRUD
+│   ├── part2-bookings/plan.md # Plan for booking lifecycle & overlap engine
+│   └── part3-search/plan.md # Plan for date range availability search
 ├── app/
 │   ├── __init__.py
 │   ├── main.py             # FastAPI entrypoint, lifespan startup, & /health route
@@ -205,9 +207,11 @@ apartment-booking/
 │   ├── schemas.py          # Pydantic validation schemas
 │   ├── services/
 │   │   ├── __init__.py
+│   │   ├── apartment_service.py # Apartment catalog rules & availability search
 │   │   └── booking_service.py # Overlap validation engine & booking lifecycle
 │   └── routers/
 │       ├── __init__.py
+│       ├── apartments.py   # /apartments REST endpoints (US1, US3)
 │       └── bookings.py     # /bookings REST endpoints (US2, US4)
 └── tests/
     ├── __init__.py
@@ -215,6 +219,10 @@ apartment-booking/
     ├── test_health.py      # Health check and root redirect tests
     ├── test_database.py    # Engine connection, PRAGMA, and settings tests
     ├── test_models_schemas.py # Schema validation and ORM persistence tests
+    ├── test_apartment_schemas.py # US1 apartment input validation tests
+    ├── test_apartment_service.py # US1 apartment service and deletion policy tests
+    ├── test_apartments.py  # US1 apartment REST API tests
+    ├── test_search.py      # US3 availability search tests
     ├── test_bookings.py    # US2 booking lifecycle, pricing, and error handling tests
     └── test_overlap.py     # US4 comprehensive overlap collision tests
 ```
