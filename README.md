@@ -128,7 +128,7 @@ classDiagram
    Cancelling a reservation (`POST /bookings/{id}/cancel`) marks `status = 'CANCELLED'`. This retains booking history for auditing while **immediately freeing up the calendar dates** for other guests. Cancelled bookings are immutable.
 
 4. **Referential Integrity & Deletion Protection:**
-   Foreign key constraints are enforced with `ondelete="RESTRICT"`. An apartment with active/confirmed bookings **cannot be deleted**, preventing orphaned guest reservations.
+   Foreign key constraints are enforced with `ondelete="RESTRICT"`. An apartment with active/confirmed bookings **cannot be deleted**, preventing orphaned guest reservations (`409 Conflict`). Once its stays are cancelled or finished, deleting the apartment (`204 No Content`) also removes that booking history.
 
 ---
 
@@ -197,7 +197,10 @@ apartment-booking/
 │   ├── part0-scaffold/plan.md # Plan for initial setup & test harness
 │   ├── part1-apartments/plan.md # Plan for apartment catalog CRUD
 │   ├── part2-bookings/plan.md # Plan for booking lifecycle & overlap engine
-│   └── part3-search/plan.md # Plan for date range availability search
+│   ├── part3-search/plan.md # Plan for date range availability search
+│   └── part4-demo/plan.md # Plan for end-to-end demo & Checkpoint 1 sign-off
+├── scripts/
+│   └── demo.sh             # One-command end-to-end demo (all user stories + persistence)
 ├── app/
 │   ├── __init__.py
 │   ├── main.py             # FastAPI entrypoint, lifespan startup, & /health route
@@ -223,6 +226,7 @@ apartment-booking/
     ├── test_apartment_service.py # US1 apartment service and deletion policy tests
     ├── test_apartments.py  # US1 apartment REST API tests
     ├── test_search.py      # US3 availability search tests
+    ├── test_demo_script.py # End-to-end test running scripts/demo.sh
     ├── test_bookings.py    # US2 booking lifecycle, pricing, and error handling tests
     └── test_overlap.py     # US4 comprehensive overlap collision tests
 ```
@@ -592,11 +596,14 @@ The next time Uvicorn starts, a pristine, empty database will be recreated autom
 
 ## 14. Checkpoint 1 Compliance Checklist
 
-| Checkpoint 1 Criteria | Implementation Evidence | Status |
-| :--- | :--- | :---: |
-| **Selected Project Case & First Users** | Documented in [Section 2](#2-selected-project-case--first-users) (Marco the Host and Elena the Guest). | ✅ |
-| **Domain Concept Map** | Visual Mermaid class diagram and business rules in [Section 3](#3-domain-concept-map). | ✅ |
-| **Running Application Implementing Stories** | All 4 user stories implemented and verified via automated test suite and live API. | ✅ |
-| **Documented API Without GUI** | Interactive Swagger UI (`/docs`), ReDoc (`/redoc`), and raw OpenAPI JSON spec (`/openapi.json`). | ✅ |
-| **Persistent Storage Surviving Restarts** | SQLite file at `./data/apartments.db` with WAL mode and foreign key enforcement. | ✅ |
-| **Instructions to Start & Try Commands** | Complete [Quickstart Guide](#8-quickstart-guide-3-steps-to-run) and [Step-by-Step cURL Guide](#10--demonstrating-the-system-two-options). | ✅ |
+| Checkpoint 1 Criteria | Implementation Evidence | How to Verify | Status |
+| :--- | :--- | :--- | :---: |
+| **Selected Project Case & First Users** | Apartment booking case with Marco the Host and Elena the Guest ([Section 2](#2-selected-project-case--first-users)). | Read Section 2. | ✅ |
+| **Domain Concept Map** | Mermaid class diagram of `Apartment`, `Booking`, `BookingStatus` and business rules ([Section 3](#3-domain-concept-map)); matches `app/models.py`. | Read Section 3. | ✅ |
+| **Running Application Implementing Stories** | All 4 user stories: US1 apartments CRUD, US2 booking lifecycle, US3 date range search, US4 overlap prevention ([Section 4](#4-user-stories--acceptance-criteria)). | `./scripts/demo.sh` (48 checks, steps 1–9 and 12). | ✅ |
+| **Automated Test Cases** | Unit, API integration, and end-to-end tests for every user story, run against an isolated in-memory database ([Section 12](#12-running-automated-tests--coverage)). | `pytest` | ✅ |
+| **Documented API Without GUI** | Swagger UI (`/docs`), ReDoc (`/redoc`), OpenAPI spec (`/openapi.json`) listing every endpoint. | Demo step 11, or open `/docs`. | ✅ |
+| **Persistent Storage Surviving Restarts** | SQLite file `./data/apartments.db` (WAL mode, foreign keys enforced). | Demo step 10 restarts the server automatically; manual steps in [Section 11](#11-verifying-data-persistence-across-server-restarts). | ✅ |
+| **Instructions to Start & Try Commands from the Terminal** | [Quickstart](#8-quickstart-guide-3-steps-to-run), one-command demo, and a copy-pasteable cURL walkthrough ([Section 10](#10--demonstrating-the-system-two-options)). | Follow Sections 8 and 10 in a terminal. | ✅ |
+
+All items above were re-verified on a fresh clone (new virtual environment, `pip install -r requirements.txt`, Quickstart, `./scripts/demo.sh`, `pytest`) before tagging the release `checkpoint-1`.

@@ -173,7 +173,7 @@ flowchart TD
 ### Phase 4: Integration, Verification & Checkpoint 1 Delivery (Part 4)
 *Status: Final Verification*
 
-- [ ] **Step 4.1: Demonstration of the Working System (Two Options Available)**
+- [x] **Step 4.1: Demonstration of the Working System (Two Options Available)**
   - **Option 1: Automated End-to-End Demo Script (`scripts/demo.sh`)**
     - Executable shell script with clean colorized terminal output executing the complete user journey and asserting HTTP codes:
       1. Health check verification (`GET /health`).
@@ -188,11 +188,11 @@ flowchart TD
       10. Server restart & data persistence verification.
   - **Option 2: Step-by-Step Manual cURL Walkthrough**
     - Fully documented, copy-pasteable terminal instructions documented in `README.md` allowing the evaluator or developer to run each step interactively and inspect JSON responses.
-- [ ] **Step 4.2: Data Persistence Verification Test**
+- [x] **Step 4.2: Data Persistence Verification Test**
   - Verify records remain in `./data/apartments.db` after stopping and restarting the server (both automated in script and documented manually).
-- [ ] **Step 4.3: Interactive Swagger Verification**
+- [x] **Step 4.3: Interactive Swagger Verification**
   - Verify `/docs` schema, tags, and documentation descriptions.
-- [ ] **Step 4.4: Checkpoint 1 Sign-Off**
+- [x] **Step 4.4: Checkpoint 1 Sign-Off**
   - Confirm all grading criteria for Prof. Janes are satisfied.
 
 ---
