@@ -277,19 +277,39 @@ For grading and verification, you can choose between two demonstration approache
 
 ### Option 1: Automated Demo Script (`scripts/demo.sh`)
 
-If you want to verify the entire system in one command, an automated bash script runs the full user journey:
+Verify the entire system with **one command** (from the project root, with dependencies installed):
 
-1. Ensure the server is running in terminal 1:
-   ```bash
-   uvicorn app.main:app --host 127.0.0.1 --port 8000
-   ```
-2. Open terminal 2 and run:
-   ```bash
-   chmod +x scripts/demo.sh
-   ./scripts/demo.sh
-   ```
+```bash
+./scripts/demo.sh
+```
 
-The script exercises health checks, listing creation, search queries, booking reservations, overlap rejection (`409 Conflict`), same-day turnarounds, booking updates, cancellations, and persistence, printing color-coded status checks.
+The script starts its own server on a free port with a **temporary database** (your `./data/apartments.db` is never touched), runs the full user journey, restarts the server to prove persistence, and cleans up afterwards. It takes a few seconds.
+
+| Step | What is checked |
+| :--- | :--- |
+| 1 | `GET /health` → `200` |
+| 2 | Host adds 2 apartments (`201`), invalid price rejected (`422`), price updated (`PUT` → `200`), apartments listed and viewed (US1) |
+| 3 | Guest searches a date range → both apartments available; invalid range → `400` (US3) |
+| 4 | Elena books apartment 1 → `201`, price = nights × price per night; apartment disappears from search (US2) |
+| 5 | Overlapping booking → `409`; same-day turnaround → `201` (US4) |
+| 6 | Second guest books apartment 2 instead → `201` |
+| 7 | Booking dates changed and booking transferred to another apartment, with re-checked overlaps and recalculated prices (US2, US4) |
+| 8 | Elena cancels → `CANCELLED` (US2) |
+| 9 | Search again → apartment 1 is free again (US3) |
+| 10 | Server is stopped and restarted → all changes are still there (persistence) |
+| 11 | `/docs` and `/openapi.json` document every endpoint |
+| 12 | Apartment with active stays cannot be removed (`409`); after cancellations it is removed (`204`) (US1) |
+
+Every step asserts the HTTP status code and key response values. Each check prints `✔`; the first failed check prints `✘` with the server response and the script exits with code `1`.
+
+Dates are calculated relative to today, so the demo never goes out of date.
+
+**Against a server you already started** (e.g. to watch requests in its log), pass its URL. The restart step is then skipped, and the demo removes the data it created at the end:
+```bash
+BASE_URL=http://127.0.0.1:8000 ./scripts/demo.sh
+```
+
+Help: `./scripts/demo.sh --help`. The script works on macOS and Linux (bash 3.2+, `curl`, Python; no `jq` needed) and runs inside the test suite as `tests/test_demo_script.py`.
 
 ---
 
@@ -299,6 +319,8 @@ If you prefer to execute commands one by one to inspect the requests and respons
 
 > [!TIP]
 > The commands below use standard bash variables (`APT_ID` and `BOOKING_ID`) so you can copy and paste them directly into your terminal in order!
+>
+> Run the steps **in order on an empty database** (`rm -f data/apartments.db` before starting the server). The example dates are in November 2027; if they are already in the past, replace them with future dates — bookings that have already ended no longer count as active.
 
 #### Step 1: Verify the API is Alive
 Check that the service is running:
@@ -360,17 +382,23 @@ curl -s -X PUT "http://127.0.0.1:8000/apartments/${APT_ID}" \
 
 #### Step 3: Search for Available Apartments (US3)
 
-Find apartments available for a stay between `2026-11-01` and `2026-11-05`:
+Find apartments available for a stay between `2027-11-01` and `2027-11-05`:
 ```bash
-curl -s -X GET "http://127.0.0.1:8000/apartments/search?start_date=2026-11-01&end_date=2026-11-05"
+curl -s -X GET "http://127.0.0.1:8000/apartments/search?start_date=2027-11-01&end_date=2027-11-05"
 ```
-**Expected Output:** `200 OK` with an array containing `Sunny Alpine Studio` (since it currently has no bookings).
+**Expected Output:** `200 OK` with an array containing `Sunny Alpine Studio (Renovated)` (since it currently has no bookings).
+
+An invalid range (check-out before check-in) is rejected:
+```bash
+curl -s -i "http://127.0.0.1:8000/apartments/search?start_date=2027-11-05&end_date=2027-11-01"
+```
+**Expected Output:** `HTTP/1.1 400 Bad Request`
 
 ---
 
 #### Step 4: Create a Booking with Automatic Price Calculation (US2)
 
-Elena reserves the apartment from `2026-11-01` to `2026-11-05` (4 nights $\times$ 120.0 € = 480.0 €):
+Elena reserves the apartment from `2027-11-01` to `2027-11-05` (4 nights $\times$ 120.0 € = 480.0 €):
 ```bash
 BOOKING_RESP=$(curl -s -X POST http://127.0.0.1:8000/bookings \
   -H "Content-Type: application/json" \
@@ -378,8 +406,8 @@ BOOKING_RESP=$(curl -s -X POST http://127.0.0.1:8000/bookings \
     \"apartment_id\": \"${APT_ID}\",
     \"guest_name\": \"Elena Rossi\",
     \"guest_email\": \"elena.rossi@example.com\",
-    \"start_date\": \"2026-11-01\",
-    \"end_date\": \"2026-11-05\"
+    \"start_date\": \"2027-11-01\",
+    \"end_date\": \"2027-11-05\"
   }")
 echo $BOOKING_RESP
 ```
@@ -390,8 +418,8 @@ echo $BOOKING_RESP
   "apartment_id": "...",
   "guest_name": "Elena Rossi",
   "guest_email": "elena.rossi@example.com",
-  "start_date": "2026-11-01",
-  "end_date": "2026-11-05",
+  "start_date": "2027-11-01",
+  "end_date": "2027-11-05",
   "total_price": 480.0,
   "status": "CONFIRMED",
   "created_at": "..."
@@ -410,20 +438,20 @@ echo "Using Booking ID: $BOOKING_ID"
 ##### 5.1 Test Collision Rejection (Nov 3 to Nov 7)
 Bob attempts to book the same apartment for dates overlapping Elena's stay:
 ```bash
-curl -i -X POST http://127.0.0.1:8000/bookings \
+curl -s -i -X POST http://127.0.0.1:8000/bookings \
   -H "Content-Type: application/json" \
   -d "{
     \"apartment_id\": \"${APT_ID}\",
     \"guest_name\": \"Bob Smith\",
     \"guest_email\": \"bob.smith@example.com\",
-    \"start_date\": \"2026-11-03\",
-    \"end_date\": \"2026-11-07\"
+    \"start_date\": \"2027-11-03\",
+    \"end_date\": \"2027-11-07\"
   }"
 ```
 **Expected Output:** **`HTTP/1.1 409 Conflict`**
 ```json
 {
-  "detail": "Apartment is not available for the requested date range: 2026-11-03 to 2026-11-07. Collides with an existing booking."
+  "detail": "Apartment is not available for the requested date range: 2027-11-03 to 2027-11-07. Collides with an existing booking."
 }
 ```
 *The double booking is rejected, protecting Elena's stay.*
@@ -437,8 +465,8 @@ curl -s -X POST http://127.0.0.1:8000/bookings \
     \"apartment_id\": \"${APT_ID}\",
     \"guest_name\": \"Charlie Brown\",
     \"guest_email\": \"charlie@example.com\",
-    \"start_date\": \"2026-11-05\",
-    \"end_date\": \"2026-11-10\"
+    \"start_date\": \"2027-11-05\",
+    \"end_date\": \"2027-11-10\"
   }"
 ```
 **Expected Output:** `201 Created`  
@@ -448,16 +476,24 @@ curl -s -X POST http://127.0.0.1:8000/bookings \
 
 #### Step 6: Update a Booking / Transfer Apartment (US2)
 
-Elena decides to extend her stay by 1 day (checkout Nov 6 instead of Nov 5, total 5 nights $\times$ 120.0 € = 600.0 €):
+Elena wants to extend her stay until Nov 6, but Charlie checks in on Nov 5:
+```bash
+curl -s -X PUT "http://127.0.0.1:8000/bookings/${BOOKING_ID}" \
+  -H "Content-Type: application/json" \
+  -d '{"end_date": "2027-11-06"}'
+```
+**Expected Output:** `409 Conflict` — the changed dates are re-checked against other bookings.
+
+Instead, she arrives one day earlier (check-in Oct 31 instead of Nov 1, total 5 nights $\times$ 120.0 € = 600.0 €) and updates her email:
 ```bash
 curl -s -X PUT "http://127.0.0.1:8000/bookings/${BOOKING_ID}" \
   -H "Content-Type: application/json" \
   -d '{
-    "end_date": "2026-11-06",
+    "start_date": "2027-10-31",
     "guest_email": "elena.updated@example.com"
   }'
 ```
-**Expected Output:** `200 OK` with updated `end_date: 2026-11-06` and recalculated `total_price: 600.0`.  
+**Expected Output:** `200 OK` with updated `start_date: 2027-10-31` and recalculated `total_price: 600.0`.  
 *(Self-exclusion logic prevents the booking from colliding with its own previous dates).*
 
 ---
@@ -470,7 +506,7 @@ curl -s -X POST "http://127.0.0.1:8000/bookings/${BOOKING_ID}/cancel"
 ```
 **Expected Output:** `200 OK` with `"status": "CANCELLED"`.
 
-Now Bob re-attempts booking his previously blocked dates (Nov 3 to Nov 7):
+Now Bob books the dates Elena released (Nov 1 to Nov 5), which were blocked a moment ago:
 ```bash
 curl -s -X POST http://127.0.0.1:8000/bookings \
   -H "Content-Type: application/json" \
@@ -478,8 +514,8 @@ curl -s -X POST http://127.0.0.1:8000/bookings \
     \"apartment_id\": \"${APT_ID}\",
     \"guest_name\": \"Bob Smith\",
     \"guest_email\": \"bob.smith@example.com\",
-    \"start_date\": \"2026-11-03\",
-    \"end_date\": \"2026-11-07\"
+    \"start_date\": \"2027-11-01\",
+    \"end_date\": \"2027-11-05\"
   }"
 ```
 **Expected Output:** `201 Created`  
@@ -489,12 +525,12 @@ curl -s -X POST http://127.0.0.1:8000/bookings \
 
 #### Step 8: Verify Active Booking Deletion Protection
 
-Marco attempts to delete an apartment that has Bob's active confirmed booking:
+Marco attempts to delete an apartment that has Bob's and Charlie's active confirmed bookings:
 ```bash
-curl -i -X DELETE "http://127.0.0.1:8000/apartments/${APT_ID}"
+curl -s -i -X DELETE "http://127.0.0.1:8000/apartments/${APT_ID}"
 ```
 **Expected Output:** **`HTTP/1.1 409 Conflict`**  
-*(Foreign key restriction prevents deleting the apartment, protecting Bob's stay).*
+*(Apartments with active stays cannot be removed, protecting Bob's and Charlie's bookings. Once their bookings are cancelled or finished, `DELETE` succeeds with `204 No Content`.)*
 
 ---
 
@@ -538,9 +574,9 @@ pytest --cov=app --cov-report=term-missing
 ```
 
 ### Key Test Properties:
-- **Fast Execution:** 33 tests execute in under 0.5 seconds.
+- **Fast Execution:** the whole suite runs in a few seconds.
 - **Zero Test Pollution:** Tests run against an in-memory SQLite database (`StaticPool`) and **never touch or pollute** `./data/apartments.db`.
-- **97% Code Coverage:** Covers all edge cases, self-collisions, cancellations, and foreign key integrity.
+- **High Coverage (~98%):** unit tests (schemas, services), API integration tests for all four user stories, and an end-to-end test that runs `scripts/demo.sh` against a real server process.
 
 ---
 
