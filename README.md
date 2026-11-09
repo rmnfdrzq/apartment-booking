@@ -261,11 +261,11 @@ For a fresh checkout, run the entire application, database, and interactive web 
 
 ### Exact Commands for Fresh Checkout:
 
-1. **Start the Application in the Background:**
+1. **Start the Application in the Background (with Live Updates):**
    ```bash
    docker compose up --build -d
    ```
-   *Builds the container from `python:3.12-slim`, mounts the persistent volume `apartment_data`, runs startup table migrations, and starts Uvicorn on port `8000`.*
+   *Builds the container from `python:3.12-slim`, mounts persistent volume `apartment_data:/app/data` and live source `./app:/app/app`, runs startup table migrations, and starts Uvicorn with auto-reload on port `8000`.*
 
 2. **Verify Container Health & Running Status:**
    ```bash
@@ -275,9 +275,11 @@ For a fresh checkout, run the entire application, database, and interactive web 
 
 3. **Run Automated Test Suite Inside Container:**
    ```bash
+   docker compose exec web pytest
+   # Or from a cold container run:
    docker compose run --rm web pytest
    ```
-   *Executes all 163 unit, integration, and UI tests within the Docker container environment.*
+   *Executes all 165 unit, integration, and UI tests within the Docker container environment.*
 
 4. **Stop the Application (Preserving Database Data):**
    ```bash
@@ -289,6 +291,12 @@ For a fresh checkout, run the entire application, database, and interactive web 
    ```bash
    docker compose down -v
    ```
+
+### ⚡ Live Updates & Hot-Reloading (No Restart Needed):
+- **Instant Code Reflection:** The host directory `./app` is bind-mounted directly into the container (`/app/app`), so any file saved on your host machine is immediately visible inside the container.
+- **Auto-Reloading Backend:** Uvicorn runs with `--reload`, automatically detecting Python file changes and restarting the server without downtime.
+- **Browser Live Refresh (SSE):** The frontend connects to `/dev/live-reload` via Server-Sent Events. When any HTML, CSS, JavaScript, or Python file is saved on the host, the browser page refreshes automatically without needing to restart Docker or manually reload the page.
+- **No-Cache Static Headers:** Static files and HTML responses include `Cache-Control: no-cache, no-store, must-revalidate` preventing stale browser caching on reload.
 
 ---
 
@@ -319,6 +327,7 @@ Once running:
 - **Web App:** [http://127.0.0.1:8000](http://127.0.0.1:8000)
 - **API Docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **Database file:** Automatically created at `./data/apartments.db`.
+- **Live Updates:** Automatic SSE reload and no-cache headers operate out of the box when editing any files.
 
 ---
 
@@ -328,9 +337,9 @@ The application provides an interactive single-page web interface served at **[h
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│ 🏠 Apartment Booking — Urban Short-Stay Rentals                        │
+│ 🏠 Apartment Booking                                                   │
 ├────────────────────────────────────────────────────────────────────────┤
-│ [🔍 Search & Book]     [🏢 Apartments]     [📅 Bookings]    [📘 API Docs]│
+│ [Search & Book]        [Apartments]        [Bookings]       [API Docs] │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  FIND AN APARTMENT FOR YOUR STAY                                       │
@@ -755,7 +764,7 @@ The application guarantees that all catalog listings and reservations survive ap
 
 ## 14. Running Automated Tests & Coverage
 
-The test suite contains **163 automated tests** covering schemas, services, overlap conflict detection, REST APIs, static assets, web UI HTML delivery, and OpenAPI documentation integrity.
+The test suite contains **165 automated tests** covering schemas, services, overlap conflict detection, REST APIs, static assets, web UI HTML delivery, live updates, and OpenAPI documentation integrity.
 
 ### Run Tests Locally (Host Machine):
 ```bash
@@ -769,11 +778,13 @@ pytest --cov=app --cov-report=term-missing
 
 ### Run Tests Inside Docker Container:
 ```bash
+docker compose exec web pytest
+# Or from a cold container run:
 docker compose run --rm web pytest
 ```
 
 ### Test Suite Highlights:
-- **163 Passed Tests** with **98% line & branch coverage**.
+- **165 Passed Tests** with **97% line & branch coverage**.
 - **In-Memory SQLite Isolation:** Test database uses `StaticPool` in memory; running `pytest` will **never touch or pollute** `./data/apartments.db`.
 - **Comprehensive Scenarios:** Covers valid workflows, edge cases, negative numbers, extreme date windows, same-day turnover, self-collision exclusion on edits, and full web UI form elements.
 
@@ -802,7 +813,7 @@ Removes all containers, internal networks, and the `apartment_data` persistent v
 | **Web Application with Forms for Existing Workflows** | Single-page responsive web app at `/` with forms for searching, booking, adding/editing apartments, and modifying/cancelling reservations ([Section 10](#10--interactive-web-application-forms--workflows)). | Open [http://localhost:8000](http://localhost:8000) in browser; run `tests/test_web_ui.py`. | ✅ |
 | **Resource-Oriented REST API** | Semantic URLs (`/apartments`, `/bookings`), standard HTTP methods (`GET`, `POST`, `PUT`, `DELETE`), clean JSON bodies, standard status codes (`200`, `201`, `204`, `400`, `404`, `409`, `422`) ([Section 11](#11--resource-oriented-rest-api--openapi-specification)). | Read Section 11; explore `/docs`. | ✅ |
 | **Documented OpenAPI Specification** | Enriched OpenAPI 3.1 documentation with parameters, realistic examples, and error schemas (`400`, `404`, `409`, `422`). Exported to `docs/openapi.json` and `docs/openapi.yaml`. | Open [http://localhost:8000/docs](http://localhost:8000/docs); run `tests/test_openapi.py`. | ✅ |
-| **Unit & Integration Tests for Key Rules** | 163 automated tests (98% branch coverage) testing date math, overlap formulas, cancellation release, deletion protection, and web UI. | Run `pytest -v` or `docker compose run --rm web pytest`. | ✅ |
+| **Unit & Integration Tests for Key Rules** | 165 automated tests (97% branch coverage) testing date math, overlap formulas, cancellation release, deletion protection, and web UI. | Run `pytest -v` or `docker compose exec web pytest`. | ✅ |
 | **Persistent Docker Volumes for Databases** | Docker Compose configured with named volume `apartment_data:/app/data` backing SQLite ([Section 8](#8--docker-quickstart-fresh-checkout-commands), [Section 13](#13-verifying-persistent-storage-across-restarts--docker-volumes)). | Run `docker compose down` then `docker compose up -d` and inspect data. | ✅ |
 | **Verified Workflows Started with Docker Compose** | Multi-platform container based on `python:3.12-slim` with automated healthcheck and complete workflow support. | Run `docker compose up --build -d` and try web app or curl. | ✅ |
 | **Documented Exact Commands & Web Address** | Exact commands to start, stop, and test from a fresh checkout documented alongside web address `http://localhost:8000` ([Section 8](#8--docker-quickstart-fresh-checkout-commands)). | Follow Section 8 from a clean shell. | ✅ |
