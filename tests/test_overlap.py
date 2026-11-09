@@ -56,7 +56,7 @@ def test_overlap_exact_match(
             "end_date": "2026-11-15",
         },
     )
-    assert response.status_code == 201  # CI demo: intentionally wrong, a double booking must be 409
+    assert response.status_code == 409
     assert "collides with an existing booking" in response.json()["detail"].lower()
 
 
