@@ -1,0 +1,1303 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Apartment Booking API",
+    "description": "A headless RESTful API for managing apartments, bookings, date-range availability, and preventing overlapping reservations.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/apartments": {
+      "post": {
+        "tags": [
+          "Apartments"
+        ],
+        "summary": "Add an apartment",
+        "description": "Create a new apartment listing with title, address, nightly price, and guest capacity.",
+        "operationId": "create_apartment_apartments_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApartmentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApartmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in request payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Apartments"
+        ],
+        "summary": "List apartments",
+        "description": "Retrieve apartments in creation order with pagination.",
+        "operationId": "list_apartments_apartments_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of apartments to return",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum number of apartments to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of apartments to skip",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of apartments to skip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApartmentResponse"
+                  },
+                  "title": "Response List Apartments Apartments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid query parameters (limit or offset out of bounds)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/apartments/search": {
+      "get": {
+        "tags": [
+          "Apartments"
+        ],
+        "summary": "Search available apartments",
+        "description": "Find apartments with no confirmed booking overlapping the stay [start_date, end_date). Check-in on another guest's check-out day is allowed, and cancelled bookings never block an apartment.",
+        "operationId": "search_apartments_apartments_search_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Check-in date (inclusive), YYYY-MM-DD",
+              "title": "Start Date"
+            },
+            "description": "Check-in date (inclusive), YYYY-MM-DD"
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Check-out date (exclusive), YYYY-MM-DD",
+              "title": "End Date"
+            },
+            "description": "Check-out date (exclusive), YYYY-MM-DD"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of apartments to return",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum number of apartments to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of apartments to skip",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of apartments to skip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApartmentResponse"
+                  },
+                  "title": "Response Search Apartments Apartments Search Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "start_date is not strictly before end_date",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid query parameters or date formats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/apartments/{apartment_id}": {
+      "get": {
+        "tags": [
+          "Apartments"
+        ],
+        "summary": "Get apartment details",
+        "description": "Retrieve a single apartment by ID.",
+        "operationId": "get_apartment_apartments__apartment_id__get",
+        "parameters": [
+          {
+            "name": "apartment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Apartment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApartmentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Apartment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Apartments"
+        ],
+        "summary": "Update an apartment",
+        "description": "Partially update an apartment: only the fields sent in the body are changed. Prices of already confirmed bookings are not affected.",
+        "operationId": "update_apartment_apartments__apartment_id__put",
+        "parameters": [
+          {
+            "name": "apartment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Apartment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApartmentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApartmentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Apartment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in request payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Apartments"
+        ],
+        "summary": "Remove an apartment",
+        "description": "Delete an apartment together with its cancelled and finished bookings. Rejected with 409 Conflict while the apartment has active (upcoming or ongoing) bookings.",
+        "operationId": "delete_apartment_apartments__apartment_id__delete",
+        "parameters": [
+          {
+            "name": "apartment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Apartment Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Apartment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Apartment has active bookings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Create a new booking",
+        "description": "Reserve an apartment for a specified date range. Rejects overlapping bookings with 409 Conflict.",
+        "operationId": "create_booking_bookings_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid dates (e.g. check-in date is not before check-out date)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Apartment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Apartment is not available for the requested date range (collision with existing booking)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in request payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "List all bookings",
+        "description": "Retrieve all bookings with pagination, optionally filtered by apartment ID.",
+        "operationId": "list_bookings_bookings_get",
+        "parameters": [
+          {
+            "name": "apartment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by apartment ID",
+              "title": "Apartment Id"
+            },
+            "description": "Filter by apartment ID"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of bookings to return",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum number of bookings to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Offset for pagination",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Offset for pagination"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookingResponse"
+                  },
+                  "title": "Response List Bookings Bookings Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid query parameters (limit or offset out of bounds)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/{booking_id}": {
+      "get": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Get booking details",
+        "description": "Retrieve full details for a specific booking by ID.",
+        "operationId": "get_booking_bookings__booking_id__get",
+        "parameters": [
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Booking Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Booking not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Update a booking",
+        "description": "Update dates, guest information, or move booking to another apartment.",
+        "operationId": "update_booking_bookings__booking_id__put",
+        "parameters": [
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Booking Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Booking not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid dates or attempting to modify a cancelled booking",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Apartment is not available for updated dates (collision with existing booking)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error in request payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/{booking_id}/cancel": {
+      "post": {
+        "tags": [
+          "Bookings"
+        ],
+        "summary": "Cancel a booking",
+        "description": "Mark booking status as CANCELLED, freeing up the dates for new reservations.",
+        "operationId": "cancel_booking_bookings__booking_id__cancel_post",
+        "parameters": [
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Booking Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Booking not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Health check",
+        "description": "Check whether the API service is alive and healthy.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApartmentCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title",
+            "description": "Apartment listing title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Detailed description of the apartment"
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Address",
+            "description": "Physical address"
+          },
+          "price_per_night": {
+            "type": "number",
+            "maximum": 1000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Price Per Night",
+            "description": "Price per night in euros"
+          },
+          "max_guests": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Guests",
+            "description": "Maximum number of guests allowed",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "address",
+          "price_per_night"
+        ],
+        "title": "ApartmentCreate",
+        "description": "Payload for creating a new apartment listing.",
+        "example": {
+          "address": "Piazza Walther 4, Bolzano",
+          "description": "Cozy studio near Waltherplatz with mountain views.",
+          "max_guests": 2,
+          "price_per_night": 110.0,
+          "title": "Sunny Alpine Studio"
+        }
+      },
+      "ApartmentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "address": {
+            "type": "string",
+            "title": "Address"
+          },
+          "price_per_night": {
+            "type": "number",
+            "title": "Price Per Night"
+          },
+          "max_guests": {
+            "type": "integer",
+            "title": "Max Guests"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "address",
+          "price_per_night",
+          "max_guests",
+          "created_at"
+        ],
+        "title": "ApartmentResponse",
+        "description": "Serialized apartment response.",
+        "example": {
+          "address": "Piazza Walther 4, Bolzano",
+          "created_at": "2026-11-09T10:00:00Z",
+          "description": "Cozy studio near Waltherplatz with mountain views.",
+          "id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
+          "max_guests": 2,
+          "price_per_night": 110.0,
+          "title": "Sunny Alpine Studio"
+        }
+      },
+      "ApartmentUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Send null or an empty string to clear the description"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "price_per_night": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1000000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Per Night"
+          },
+          "max_guests": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Guests"
+          }
+        },
+        "type": "object",
+        "title": "ApartmentUpdate",
+        "description": "Partial update payload: only the fields sent in the request body are changed.",
+        "example": {
+          "price_per_night": 125.0,
+          "title": "Sunny Alpine Studio (Renovated)"
+        }
+      },
+      "BookingCreate": {
+        "properties": {
+          "guest_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Guest Name",
+            "description": "Full name of the guest"
+          },
+          "guest_email": {
+            "type": "string",
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "title": "Guest Email",
+            "description": "Valid contact email of the guest"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date",
+            "description": "Check-in date (inclusive)"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date",
+            "description": "Check-out date (exclusive)"
+          },
+          "apartment_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Apartment Id",
+            "description": "ID of the apartment being booked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "guest_name",
+          "guest_email",
+          "start_date",
+          "end_date",
+          "apartment_id"
+        ],
+        "title": "BookingCreate",
+        "description": "Payload for creating a new booking.",
+        "example": {
+          "apartment_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
+          "end_date": "2026-12-05",
+          "guest_email": "elena.rossi@example.com",
+          "guest_name": "Elena Rossi",
+          "start_date": "2026-12-01"
+        }
+      },
+      "BookingResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "apartment_id": {
+            "type": "string",
+            "title": "Apartment Id"
+          },
+          "guest_name": {
+            "type": "string",
+            "title": "Guest Name"
+          },
+          "guest_email": {
+            "type": "string",
+            "title": "Guest Email"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date"
+          },
+          "total_price": {
+            "type": "number",
+            "title": "Total Price"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "apartment_id",
+          "guest_name",
+          "guest_email",
+          "start_date",
+          "end_date",
+          "total_price",
+          "status",
+          "created_at"
+        ],
+        "title": "BookingResponse",
+        "description": "Serialized booking response.",
+        "example": {
+          "apartment_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
+          "created_at": "2026-11-09T10:15:00Z",
+          "end_date": "2026-12-05",
+          "guest_email": "elena.rossi@example.com",
+          "guest_name": "Elena Rossi",
+          "id": "7fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "start_date": "2026-12-01",
+          "status": "CONFIRMED",
+          "total_price": 440.0
+        }
+      },
+      "BookingStatus": {
+        "type": "string",
+        "enum": [
+          "CONFIRMED",
+          "CANCELLED"
+        ],
+        "title": "BookingStatus",
+        "description": "Lifecycle status of a booking."
+      },
+      "BookingUpdate": {
+        "properties": {
+          "apartment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apartment Id",
+            "description": "Move booking to a different apartment ID"
+          },
+          "guest_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Name"
+          },
+          "guest_email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guest Email"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          }
+        },
+        "type": "object",
+        "title": "BookingUpdate",
+        "description": "Payload for updating an existing booking.",
+        "example": {
+          "end_date": "2026-12-06",
+          "guest_email": "elena.updated@example.com"
+        }
+      },
+      "ErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "description": "Human-readable error explanation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorResponse",
+        "description": "Standard error response payload.",
+        "example": {
+          "detail": "Apartment is not available for the requested date range: 2026-12-01 to 2026-12-05. Collides with an existing booking."
+        }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ValidationErrorItem": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Loc",
+            "description": "Path to the invalid field"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Msg",
+            "description": "Validation failure explanation"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Error classification identifier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationErrorItem",
+        "description": "Validation error item detail."
+      },
+      "ValidationErrorResponse": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationErrorItem"
+            },
+            "type": "array",
+            "title": "Detail",
+            "description": "List of field-level validation errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ValidationErrorResponse",
+        "description": "FastAPI request validation error response payload (HTTP 422).",
+        "example": {
+          "detail": [
+            {
+              "loc": [
+                "body",
+                "price_per_night"
+              ],
+              "msg": "Input should be greater than 0",
+              "type": "greater_than"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Apartments",
+      "description": "Apartment listing catalog (US1) and date-range availability search (US3)."
+    },
+    {
+      "name": "Bookings",
+      "description": "Guest stay reservations (US2) and overlap conflict prevention engine (US4)."
+    },
+    {
+      "name": "System",
+      "description": "System health and operational monitoring."
+    }
+  ]
+}

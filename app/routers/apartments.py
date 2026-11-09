@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Apartment
-from app.schemas import ApartmentCreate, ApartmentResponse, ApartmentUpdate
+from app.schemas import (
+    ApartmentCreate,
+    ApartmentResponse,
+    ApartmentUpdate,
+    ErrorResponse,
+    ValidationErrorResponse,
+)
 from app.services import apartment_service
 
 router = APIRouter(
@@ -17,7 +23,10 @@ router = APIRouter(
 )
 
 NOT_FOUND_RESPONSE: Dict[Union[int, str], Dict[str, Any]] = {
-    status.HTTP_404_NOT_FOUND: {"description": "Apartment not found"},
+    status.HTTP_404_NOT_FOUND: {
+        "model": ErrorResponse,
+        "description": "Apartment not found",
+    },
 }
 
 # Keep GET /apartments/search ABOVE the /{apartment_id} routes,
@@ -30,6 +39,12 @@ NOT_FOUND_RESPONSE: Dict[Union[int, str], Dict[str, Any]] = {
     status_code=status.HTTP_201_CREATED,
     summary="Add an apartment",
     description="Create a new apartment listing with title, address, nightly price, and guest capacity.",
+    responses={
+        422: {
+            "model": ValidationErrorResponse,
+            "description": "Validation error in request payload",
+        },
+    },
 )
 def create_apartment(
     payload: ApartmentCreate,
@@ -44,6 +59,12 @@ def create_apartment(
     response_model=List[ApartmentResponse],
     summary="List apartments",
     description="Retrieve apartments in creation order with pagination.",
+    responses={
+        422: {
+            "model": ValidationErrorResponse,
+            "description": "Invalid query parameters (limit or offset out of bounds)",
+        },
+    },
 )
 def list_apartments(
     limit: int = Query(100, ge=1, le=500, description="Maximum number of apartments to return"),
@@ -64,7 +85,14 @@ def list_apartments(
         "and cancelled bookings never block an apartment."
     ),
     responses={
-        status.HTTP_400_BAD_REQUEST: {"description": "start_date is not strictly before end_date"},
+        status.HTTP_400_BAD_REQUEST: {
+            "model": ErrorResponse,
+            "description": "start_date is not strictly before end_date",
+        },
+        422: {
+            "model": ValidationErrorResponse,
+            "description": "Invalid query parameters or date formats",
+        },
     },
 )
 def search_apartments(
@@ -107,7 +135,13 @@ def get_apartment(
         "Partially update an apartment: only the fields sent in the body are changed. "
         "Prices of already confirmed bookings are not affected."
     ),
-    responses=NOT_FOUND_RESPONSE,
+    responses={
+        **NOT_FOUND_RESPONSE,
+        422: {
+            "model": ValidationErrorResponse,
+            "description": "Validation error in request payload",
+        },
+    },
 )
 def update_apartment(
     apartment_id: str,
@@ -129,7 +163,10 @@ def update_apartment(
     ),
     responses={
         **NOT_FOUND_RESPONSE,
-        status.HTTP_409_CONFLICT: {"description": "Apartment has active bookings"},
+        status.HTTP_409_CONFLICT: {
+            "model": ErrorResponse,
+            "description": "Apartment has active bookings",
+        },
     },
 )
 def delete_apartment(

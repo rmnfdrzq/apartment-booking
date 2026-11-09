@@ -29,10 +29,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, Any]:
     engine.dispose()
 
 
+tags_metadata = [
+    {
+        "name": "Apartments",
+        "description": "Apartment listing catalog (US1) and date-range availability search (US3).",
+    },
+    {
+        "name": "Bookings",
+        "description": "Guest stay reservations (US2) and overlap conflict prevention engine (US4).",
+    },
+    {
+        "name": "System",
+        "description": "System health and operational monitoring.",
+    },
+]
+
 app = FastAPI(
     title=settings.app_title,
     description=settings.app_description,
     version=settings.app_version,
+    openapi_tags=tags_metadata,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
