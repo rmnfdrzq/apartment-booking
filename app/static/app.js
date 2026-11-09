@@ -443,7 +443,7 @@ async function performSearch() {
         <div class="card apartment-card" data-apartment-id="${apt.id}">
           <div class="card-header">
             <h4 class="card-title">${escapeHtml(apt.title)}</h4>
-            <span class="badge badge-primary">ID #${apt.id}</span>
+            <span class="badge badge-primary">ID #${apt.id.slice(0, 8)}</span>
           </div>
           <div class="card-body">
             <div class="card-meta">
@@ -474,8 +474,8 @@ async function performSearch() {
     // Attach click listeners to "Book This Stay" buttons
     resultsGrid.querySelectorAll('.btn-book-apartment').forEach(btn => {
       btn.addEventListener('click', () => {
-        const aptId = parseInt(btn.getAttribute('data-apt-id'), 10);
-        const apt = results.find(a => a.id === aptId);
+        const aptId = btn.getAttribute('data-apt-id');
+        const apt = results.find(a => String(a.id) === String(aptId));
         if (apt) {
           openBookingModal(apt, startDate, endDate);
         }
@@ -545,7 +545,7 @@ async function handleCreateBooking() {
   errorEl.style.display = 'none';
   errorEl.textContent = '';
 
-  const aptId = parseInt(document.getElementById('book-apartment-id').value, 10);
+  const aptId = document.getElementById('book-apartment-id').value.trim();
   const startDate = document.getElementById('book-start-date').value;
   const endDate = document.getElementById('book-end-date').value;
   const guestName = document.getElementById('book-guest-name').value.trim();
@@ -660,7 +660,7 @@ async function loadApartments() {
       <div class="card apartment-card" data-apartment-id="${apt.id}">
         <div class="card-header">
           <h4 class="card-title">${escapeHtml(apt.title)}</h4>
-          <span class="badge badge-info">ID #${apt.id}</span>
+          <span class="badge badge-info">ID #${apt.id.slice(0, 8)}</span>
         </div>
         <div class="card-body">
           <div class="card-meta">
@@ -689,7 +689,7 @@ async function loadApartments() {
     // Attach actions
     grid.querySelectorAll('.btn-edit-apt').forEach(btn => {
       btn.addEventListener('click', () => {
-        const id = parseInt(btn.getAttribute('data-apt-id'), 10);
+        const id = btn.getAttribute('data-apt-id');
         const apt = state.apartmentsMap.get(id);
         if (apt) openEditApartmentModal(apt);
       });
@@ -697,7 +697,7 @@ async function loadApartments() {
 
     grid.querySelectorAll('.btn-delete-apt').forEach(btn => {
       btn.addEventListener('click', () => {
-        const id = parseInt(btn.getAttribute('data-apt-id'), 10);
+        const id = btn.getAttribute('data-apt-id');
         const apt = state.apartmentsMap.get(id);
         if (apt) handleDeleteApartment(apt);
       });
@@ -789,7 +789,7 @@ async function handleEditApartment() {
   const errorEl = document.getElementById('modal-edit-apt-error');
   errorEl.style.display = 'none';
 
-  const id = parseInt(document.getElementById('edit-apt-id').value, 10);
+  const id = document.getElementById('edit-apt-id').value.trim();
   const title = document.getElementById('edit-apt-title').value.trim();
   const address = document.getElementById('edit-apt-address').value.trim();
   const price = parseFloat(document.getElementById('edit-apt-price').value);
@@ -875,7 +875,7 @@ function setupBookingsWorkflow() {
   const modAptSelect = document.getElementById('modify-booking-apartment');
 
   const updateModifyModalPrice = () => {
-    const aptId = parseInt(modAptSelect.value, 10);
+    const aptId = modAptSelect.value;
     const apt = state.apartmentsMap.get(aptId);
     const startVal = modStartInput.value;
     const endVal = modEndInput.value;
@@ -931,7 +931,7 @@ function renderBookingsTable() {
   const tbody = document.getElementById('bookings-table-body');
   const filterVal = document.getElementById('filter-booking-apartment').value;
   const filtered = filterVal
-    ? state.bookings.filter(b => b.apartment_id === parseInt(filterVal, 10))
+    ? state.bookings.filter(b => String(b.apartment_id) === String(filterVal))
     : state.bookings;
 
   if (filtered.length === 0) {
@@ -970,11 +970,11 @@ function renderBookingsTable() {
 
     return `
       <tr class="${isCancelled ? 'row-cancelled' : ''}">
-        <td><strong>#${booking.id}</strong></td>
+        <td><strong>#${booking.id.slice(0, 8)}</strong></td>
         <td>
           <div class="booking-apt-info">
             <span class="booking-apt-title">${escapeHtml(aptTitle)}</span>
-            <small class="text-muted">ID #${booking.apartment_id}</small>
+            <small class="text-muted">ID #${booking.apartment_id.slice(0, 8)}</small>
           </div>
         </td>
         <td>
@@ -997,15 +997,15 @@ function renderBookingsTable() {
   // Attach action listeners
   tbody.querySelectorAll('.btn-modify-booking').forEach(btn => {
     btn.addEventListener('click', () => {
-      const id = parseInt(btn.getAttribute('data-booking-id'), 10);
-      const booking = state.bookings.find(b => b.id === id);
+      const id = btn.getAttribute('data-booking-id');
+      const booking = state.bookings.find(b => String(b.id) === String(id));
       if (booking) openModifyBookingModal(booking);
     });
   });
 
   tbody.querySelectorAll('.btn-cancel-booking').forEach(btn => {
     btn.addEventListener('click', () => {
-      const id = parseInt(btn.getAttribute('data-booking-id'), 10);
+      const id = btn.getAttribute('data-booking-id');
       handleCancelBooking(id);
     });
   });
@@ -1052,8 +1052,8 @@ async function handleModifyBooking() {
   const errorEl = document.getElementById('modal-modify-booking-error');
   errorEl.style.display = 'none';
 
-  const id = parseInt(document.getElementById('modify-booking-id').value, 10);
-  const aptId = parseInt(document.getElementById('modify-booking-apartment').value, 10);
+  const id = document.getElementById('modify-booking-id').value.trim();
+  const aptId = document.getElementById('modify-booking-apartment').value;
   const startDate = document.getElementById('modify-booking-start').value;
   const endDate = document.getElementById('modify-booking-end').value;
   const guestName = document.getElementById('modify-booking-name').value.trim();
