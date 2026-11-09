@@ -13,8 +13,10 @@ def test_health_check_returns_200(client: TestClient) -> None:
     assert "version" in data
 
 
-def test_root_redirects_to_docs(client: TestClient) -> None:
-    """Verify / redirects to /docs interactive documentation."""
-    response = client.get("/", follow_redirects=False)
-    assert response.status_code in (302, 307)
-    assert response.headers["location"] == "/docs"
+def test_root_serves_web_app(client: TestClient) -> None:
+    """Verify / serves the single-page web application frontend."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Apartment Booking" in response.text
+    assert "search-form" in response.text

@@ -3,12 +3,14 @@
 import math
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import Base, engine
@@ -83,10 +85,17 @@ async def request_validation_exception_handler(request: Request, exc: RequestVal
 app.include_router(apartments.router)
 app.include_router(bookings.router)
 
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-@app.get("/", include_in_schema=False)
-def root() -> RedirectResponse:
-    """Redirect root path to interactive Swagger documentation."""
+
+@app.get("/", include_in_schema=False, response_model=None)
+def root() -> Response:
+    """Serve the single-page web application frontend, or fallback to API docs."""
+    index_file = STATIC_DIR / "index.html"
+    if index_file.is_file():
+        return FileResponse(str(index_file), media_type="text/html")
     return RedirectResponse(url="/docs")
 
 
