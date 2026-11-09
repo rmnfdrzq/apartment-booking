@@ -36,12 +36,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests with coverage
+      # Failing tests are reported by the "Build & Unit Tests" workflow; this workflow only judges coverage.
+      - name: Measure coverage
         run: |
           python -m pytest -q \
             --cov=app --cov-report=term-missing \
             --cov-report=xml:reports/coverage.xml --cov-report=html:reports/coverage-html \
-            --cov-fail-under="$COVERAGE_MIN"
+            || echo "::warning::Some tests failed (see the Build & Unit Tests workflow); coverage is still measured."
+
+      - name: Check coverage minimum (${{ env.COVERAGE_MIN }} %)
+        run: python -m coverage report --fail-under="$COVERAGE_MIN" --format=total
 
       - name: Show coverage
         if: always()
