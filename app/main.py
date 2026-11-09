@@ -9,7 +9,8 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
@@ -57,6 +58,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 def _json_safe(value: Any) -> Any:
     """Replace NaN/Infinity (not valid JSON) with strings so error bodies can be serialized."""
@@ -90,7 +99,7 @@ if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
-@app.get("/", include_in_schema=False, response_model=None)
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False, response_model=None)
 def root() -> Response:
     """Serve the single-page web application frontend, or fallback to API docs."""
     index_file = STATIC_DIR / "index.html"

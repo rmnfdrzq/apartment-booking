@@ -20,3 +20,18 @@ def test_root_serves_web_app(client: TestClient) -> None:
     assert "text/html" in response.headers["content-type"]
     assert "Apartment Booking" in response.text
     assert "search-form" in response.text
+
+
+def test_root_supports_head_request(client: TestClient) -> None:
+    """Verify / responds to HTTP HEAD for health checkers and uptime monitors."""
+    response = client.head("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers.get("content-type", "")
+
+
+def test_cors_headers_present_on_cross_origin_request(client: TestClient) -> None:
+    """Verify CORS middleware is active and permits cross-origin requests."""
+    response = client.get("/health", headers={"Origin": "http://external-client.test"})
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == "http://external-client.test"
+    assert response.headers.get("access-control-allow-credentials") == "true"

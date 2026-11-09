@@ -382,6 +382,16 @@ function setupSearchWorkflow() {
   bookStartInput.addEventListener('input', updateBookingModalPrice);
   bookEndInput.addEventListener('input', updateBookingModalPrice);
 
+  bookStartInput.addEventListener('change', () => {
+    if (bookEndInput.value && bookEndInput.value <= bookStartInput.value) {
+      const nextDay = new Date(bookStartInput.value);
+      nextDay.setDate(nextDay.getDate() + 1);
+      bookEndInput.value = nextDay.toISOString().split('T')[0];
+    }
+    bookEndInput.min = bookStartInput.value;
+    updateBookingModalPrice();
+  });
+
   // Submit Booking Form
   const bookingForm = document.getElementById('form-create-booking');
   bookingForm.addEventListener('submit', async (e) => {
@@ -390,7 +400,10 @@ function setupSearchWorkflow() {
   });
 }
 
+let searchRequestSeq = 0;
+
 async function performSearch() {
+  const currentSeq = ++searchRequestSeq;
   const startDate = document.getElementById('search-start-date').value;
   const endDate = document.getElementById('search-end-date').value;
   const errorContainer = document.getElementById('search-error');
@@ -424,6 +437,11 @@ async function performSearch() {
     const url = `/apartments/search?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
     const results = await apiCall(url);
 
+    // Discard stale responses if a newer search was initiated in the meantime
+    if (currentSeq !== searchRequestSeq) {
+      return;
+    }
+
     resultsCount.textContent = `${results.length} available for ${nights} night${nights === 1 ? '' : 's'}`;
 
     if (results.length === 0) {
@@ -440,10 +458,10 @@ async function performSearch() {
     resultsGrid.innerHTML = results.map(apt => {
       const totalPrice = nights * apt.price_per_night;
       return `
-        <div class="card apartment-card" data-apartment-id="${apt.id}">
+        <div class="card apartment-card" data-apartment-id="${escapeHtml(apt.id)}">
           <div class="card-header">
             <h4 class="card-title">${escapeHtml(apt.title)}</h4>
-            <span class="badge badge-primary">ID #${apt.id.slice(0, 8)}</span>
+            <span class="badge badge-primary">ID #${escapeHtml(apt.id.slice(0, 8))}</span>
           </div>
           <div class="card-body">
             <div class="card-meta">
@@ -463,7 +481,7 @@ async function performSearch() {
             </div>
           </div>
           <div class="card-footer">
-            <button class="btn btn-primary btn-block btn-book-apartment" data-apt-id="${apt.id}">
+            <button class="btn btn-primary btn-block btn-book-apartment" data-apt-id="${escapeHtml(apt.id)}">
               <span>Book This Stay</span>
             </button>
           </div>
@@ -513,8 +531,13 @@ function openBookingModal(apartment, startDate, endDate) {
     <p>📍 ${escapeHtml(apartment.address)} &bull; 👥 Max ${apartment.max_guests} guests &bull; 💶 ${formatCurrency(apartment.price_per_night)} / night</p>
   `;
 
-  document.getElementById('book-start-date').value = startDate || getDateOffset(1);
-  document.getElementById('book-end-date').value = endDate || getDateOffset(4);
+  const startInput = document.getElementById('book-start-date');
+  const endInput = document.getElementById('book-end-date');
+
+  startInput.value = startDate || getDateOffset(1);
+  startInput.min = getDateOffset(0);
+  endInput.value = endDate || getDateOffset(4);
+  endInput.min = startInput.value;
 
   // Trigger price calculation
   const nights = calculateNights(
@@ -633,7 +656,7 @@ async function loadApartments() {
   const filterSelect = document.getElementById('filter-booking-apartment');
 
   try {
-    const apartments = await apiCall('/apartments');
+    const apartments = await apiCall('/apartments?limit=500');
     state.apartments = apartments;
     state.apartmentsMap.clear();
     apartments.forEach(apt => state.apartmentsMap.set(apt.id, apt));
@@ -641,7 +664,7 @@ async function loadApartments() {
     // Update filter dropdown in Bookings view
     const currentFilterVal = filterSelect.value;
     filterSelect.innerHTML = '<option value="">All Apartments</option>' +
-      apartments.map(apt => `<option value="${apt.id}">#${apt.id} — ${escapeHtml(apt.title)}</option>`).join('');
+      apartments.map(apt => `<option value="${escapeHtml(apt.id)}">#${escapeHtml(apt.id.slice(0, 8))} — ${escapeHtml(apt.title)}</option>`).join('');
     filterSelect.value = currentFilterVal;
 
     // Render apartments catalog
@@ -657,10 +680,10 @@ async function loadApartments() {
     }
 
     grid.innerHTML = apartments.map(apt => `
-      <div class="card apartment-card" data-apartment-id="${apt.id}">
+      <div class="card apartment-card" data-apartment-id="${escapeHtml(apt.id)}">
         <div class="card-header">
           <h4 class="card-title">${escapeHtml(apt.title)}</h4>
-          <span class="badge badge-info">ID #${apt.id.slice(0, 8)}</span>
+          <span class="badge badge-info">ID #${escapeHtml(apt.id.slice(0, 8))}</span>
         </div>
         <div class="card-body">
           <div class="card-meta">
@@ -676,10 +699,10 @@ async function loadApartments() {
           </div>
         </div>
         <div class="card-footer card-actions">
-          <button class="btn btn-secondary btn-sm btn-edit-apt" data-apt-id="${apt.id}">
+          <button class="btn btn-secondary btn-sm btn-edit-apt" data-apt-id="${escapeHtml(apt.id)}">
             ✏ Edit
           </button>
-          <button class="btn btn-danger btn-sm btn-delete-apt" data-apt-id="${apt.id}">
+          <button class="btn btn-danger btn-sm btn-delete-apt" data-apt-id="${escapeHtml(apt.id)}">
             🗑 Delete
           </button>
         </div>
@@ -902,6 +925,16 @@ function setupBookingsWorkflow() {
   modStartInput.addEventListener('input', updateModifyModalPrice);
   modEndInput.addEventListener('input', updateModifyModalPrice);
   modAptSelect.addEventListener('change', updateModifyModalPrice);
+
+  modStartInput.addEventListener('change', () => {
+    if (modEndInput.value && modEndInput.value <= modStartInput.value) {
+      const nextDay = new Date(modStartInput.value);
+      nextDay.setDate(nextDay.getDate() + 1);
+      modEndInput.value = nextDay.toISOString().split('T')[0];
+    }
+    modEndInput.min = modStartInput.value;
+    updateModifyModalPrice();
+  });
 }
 
 /**
@@ -910,7 +943,7 @@ function setupBookingsWorkflow() {
 async function loadBookings() {
   const tbody = document.getElementById('bookings-table-body');
   try {
-    const bookings = await apiCall('/bookings');
+    const bookings = await apiCall('/bookings?limit=500');
     state.bookings = bookings;
     renderBookingsTable();
   } catch (err) {
@@ -959,10 +992,10 @@ function renderBookingsTable() {
       ? '<span class="text-muted">—</span>'
       : `
         <div class="table-actions">
-          <button class="btn btn-secondary btn-sm btn-modify-booking" data-booking-id="${booking.id}">
+          <button class="btn btn-secondary btn-sm btn-modify-booking" data-booking-id="${escapeHtml(booking.id)}">
             Modify
           </button>
-          <button class="btn btn-danger btn-sm btn-cancel-booking" data-booking-id="${booking.id}">
+          <button class="btn btn-danger btn-sm btn-cancel-booking" data-booking-id="${escapeHtml(booking.id)}">
             Cancel
           </button>
         </div>
@@ -970,11 +1003,11 @@ function renderBookingsTable() {
 
     return `
       <tr class="${isCancelled ? 'row-cancelled' : ''}">
-        <td><strong>#${booking.id.slice(0, 8)}</strong></td>
+        <td><strong>#${escapeHtml(booking.id.slice(0, 8))}</strong></td>
         <td>
           <div class="booking-apt-info">
             <span class="booking-apt-title">${escapeHtml(aptTitle)}</span>
-            <small class="text-muted">ID #${booking.apartment_id.slice(0, 8)}</small>
+            <small class="text-muted">ID #${escapeHtml(booking.apartment_id.slice(0, 8))}</small>
           </div>
         </td>
         <td>
@@ -1015,21 +1048,37 @@ function renderBookingsTable() {
  * Open Modify Booking Modal.
  * @param {object} booking
  */
-function openModifyBookingModal(booking) {
+async function openModifyBookingModal(booking) {
   state.currentModifyBooking = booking;
+
+  if (state.apartments.length === 0) {
+    await loadApartments();
+  }
 
   document.getElementById('modify-booking-id').value = booking.id;
 
-  // Populate apartment selector
+  // Populate apartment selector with catalog entries
   const aptSelect = document.getElementById('modify-booking-apartment');
-  aptSelect.innerHTML = state.apartments.map(apt => `
-    <option value="${apt.id}" ${apt.id === booking.apartment_id ? 'selected' : ''}>
-      #${apt.id} — ${escapeHtml(apt.title)} (${formatCurrency(apt.price_per_night)}/night)
+  const aptOptions = state.apartments.map(apt => `
+    <option value="${escapeHtml(apt.id)}" ${apt.id === booking.apartment_id ? 'selected' : ''}>
+      #${escapeHtml(apt.id.slice(0, 8))} — ${escapeHtml(apt.title)} (${formatCurrency(apt.price_per_night)}/night)
     </option>
-  `).join('');
+  `);
+
+  // Ensure current booking apartment is present even if omitted from current catalog
+  if (!state.apartments.some(a => a.id === booking.apartment_id)) {
+    aptOptions.unshift(`
+      <option value="${escapeHtml(booking.apartment_id)}" selected>
+        #${escapeHtml(booking.apartment_id.slice(0, 8))} — (Current Apartment)
+      </option>
+    `);
+  }
+
+  aptSelect.innerHTML = aptOptions.join('');
 
   document.getElementById('modify-booking-start').value = booking.start_date;
   document.getElementById('modify-booking-end').value = booking.end_date;
+  document.getElementById('modify-booking-end').min = booking.start_date;
   document.getElementById('modify-booking-name').value = booking.guest_name;
   document.getElementById('modify-booking-email').value = booking.guest_email;
 
