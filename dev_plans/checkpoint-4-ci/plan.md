@@ -25,11 +25,12 @@ Run the project's checks automatically on every push and pull request (merge req
 - **Why:** The assignment asks for two workflows with distinct purposes; separate files give separate status checks and badges, so a coverage drop and a failing test are reported independently.
 
 ### Decision 2: Additional Check = Coverage Threshold (80 %)
-- **What:** `pytest --cov=app --cov-fail-under=80`. Current coverage is 91 % (measured, Section 4).
+- **What:** Measure coverage with `pytest --cov=app` (test failures do not stop the measurement), then `coverage report --fail-under=80` decides the result. Current coverage is 91 % (measured, Section 4).
 - **Why:**
   - Coverage is listed in the assignment as an accepted additional check.
   - It passes today without unrelated code changes, while a linter would first require fixing 76 existing findings and reformatting 16 files written by other team members.
   - 80 % leaves headroom for normal development but still catches large untested additions.
+  - Each workflow fails only for its own reason: a broken test turns **Build & Unit Tests** red while the **Coverage Gate** stays green, which makes the failure demonstration unambiguous (verified on GitHub).
 
 ### Decision 3: Docker Image Built and Exercised in CI
 - **What:** The tests workflow runs `docker build`, then (a) `pytest` inside the image and (b) starts a container and polls `/health`.
