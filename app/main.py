@@ -1,5 +1,6 @@
 """FastAPI application entrypoint and lifespan management."""
 
+import asyncio
 import math
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -10,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
@@ -94,9 +95,65 @@ async def request_validation_exception_handler(request: Request, exc: RequestVal
 app.include_router(apartments.router)
 app.include_router(bookings.router)
 
+class NoCacheStaticFiles(StaticFiles):
+    """StaticFiles subclass that attaches no-cache headers to prevent browser caching during development."""
+
+    async def get_response(self, path: str, scope: Any) -> Response:
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 if STATIC_DIR.is_dir():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    app.mount("/static", NoCacheStaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+def _get_app_mtime() -> float:
+    """Return the most recent modification timestamp of files in the application directory."""
+    latest = 0.0
+    app_dir = Path(__file__).resolve().parent
+    try:
+        for p in app_dir.rglob("*"):
+            if p.is_file() and not p.name.startswith((".", "__")):
+                try:
+                    m = p.stat().st_mtime
+                    if m > latest:
+                        latest = m
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return latest
+
+
+@app.get("/dev/live-reload", include_in_schema=False)
+async def dev_live_reload(request: Request) -> StreamingResponse:
+    """Server-Sent Events endpoint signaling file changes for instant live reloading."""
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        initial_mtime = _get_app_mtime()
+        while True:
+            if await request.is_disconnected():
+                break
+            await asyncio.sleep(0.4)
+            current_mtime = _get_app_mtime()
+            if current_mtime > initial_mtime:
+                yield "data: reload\n\n"
+                break
+            yield ": ping\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False, response_model=None)
@@ -104,7 +161,15 @@ def root() -> Response:
     """Serve the single-page web application frontend, or fallback to API docs."""
     index_file = STATIC_DIR / "index.html"
     if index_file.is_file():
-        return FileResponse(str(index_file), media_type="text/html")
+        return FileResponse(
+            str(index_file),
+            media_type="text/html",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
     return RedirectResponse(url="/docs")
 
 

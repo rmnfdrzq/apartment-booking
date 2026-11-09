@@ -4,20 +4,22 @@ from fastapi.testclient import TestClient
 
 
 def test_web_ui_root_serves_html(client: TestClient) -> None:
-    """Verify GET / delivers the main HTML single-page application with HTTP 200."""
+    """Verify GET / delivers the main HTML single-page application with HTTP 200 and no-cache headers."""
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
     assert "<!DOCTYPE html>" in response.text
     assert "Apartment Booking" in response.text
+    assert "no-cache" in response.headers.get("cache-control", "")
 
 
 def test_web_ui_serves_css_stylesheet(client: TestClient) -> None:
-    """Verify /static/styles.css is accessible with proper CSS mime type."""
+    """Verify /static/styles.css is accessible with proper CSS mime type and no-cache headers."""
     response = client.get("/static/styles.css")
     assert response.status_code == 200
     assert "text/css" in response.headers.get("content-type", "")
     assert "--primary:" in response.text
+    assert "no-cache" in response.headers.get("cache-control", "")
 
 
 def test_web_ui_serves_javascript_app(client: TestClient) -> None:
@@ -29,6 +31,7 @@ def test_web_ui_serves_javascript_app(client: TestClient) -> None:
     assert "setupSearchWorkflow" in response.text
     assert "setupApartmentsWorkflow" in response.text
     assert "setupBookingsWorkflow" in response.text
+    assert "setupLiveReload" in response.text
 
 
 def test_web_ui_contains_all_workflow_forms_and_modals(client: TestClient) -> None:

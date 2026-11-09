@@ -1176,6 +1176,44 @@ async function handleCancelBooking(bookingId) {
 }
 
 // -----------------------------------------------------------------------------
+// Live Reload Client (Automatic browser refresh on file saves)
+// -----------------------------------------------------------------------------
+
+function setupLiveReload() {
+  if (typeof EventSource === 'undefined') return;
+
+  let isReconnecting = false;
+  function connect() {
+    const es = new EventSource('/dev/live-reload');
+
+    es.onmessage = function (event) {
+      if (event.data === 'reload') {
+        es.close();
+        window.location.reload();
+      }
+    };
+
+    es.onerror = function () {
+      es.close();
+      if (!isReconnecting) {
+        isReconnecting = true;
+        // Server might be restarting (e.g. uvicorn reload). Try to reconnect and refresh
+        setTimeout(() => {
+          fetch('/')
+            .then(() => window.location.reload())
+            .catch(() => {
+              isReconnecting = false;
+              setTimeout(connect, 1000);
+            });
+        }, 800);
+      }
+    };
+  }
+
+  connect();
+}
+
+// -----------------------------------------------------------------------------
 // App Initialization
 // -----------------------------------------------------------------------------
 
@@ -1185,6 +1223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupSearchWorkflow();
   setupApartmentsWorkflow();
   setupBookingsWorkflow();
+  setupLiveReload();
 
   // Initial data load: apartments catalog & pre-run default search
   try {
