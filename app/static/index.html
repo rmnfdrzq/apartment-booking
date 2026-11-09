@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apartment Booking — Urban Short-Stay Rentals</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏠</text></svg>">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <span class="brand-icon">🏠</span>
+        <div class="brand-text">
+          <h1>Apartment Booking</h1>
+        </div>
+      </div>
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="search" role="tab" id="tab-search">
+          Search & Book
+        </button>
+        <button class="nav-tab" data-tab="apartments" role="tab" id="tab-apartments">
+          Apartments
+        </button>
+        <button class="nav-tab" data-tab="bookings" role="tab" id="tab-bookings">
+          Bookings
+        </button>
+        <a href="/docs" target="_blank" class="nav-link docs-link" title="OpenAPI Swagger UI Documentation">
+          API Docs
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="main-container">
+
+    <!-- Toast Notifications Area -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <!-- ================================================================= -->
+    <!-- TAB 1: Search & Book                                              -->
+    <!-- ================================================================= -->
+    <section id="view-search" class="tab-view active" role="tabpanel" aria-labelledby="tab-search">
+      <div class="panel-card search-panel">
+        <div class="panel-header">
+          <h2>Find an Apartment for Your Stay</h2>
+          <p>Search for apartments with guaranteed zero overlapping reservations for your requested travel dates.</p>
+        </div>
+
+        <form id="search-form" class="search-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="search-start-date">Check-in Date <span class="required">*</span></label>
+              <input type="date" id="search-start-date" name="start_date" required>
+            </div>
+            <div class="form-group">
+              <label for="search-end-date">Check-out Date <span class="required">*</span></label>
+              <input type="date" id="search-end-date" name="end_date" required>
+            </div>
+            <div class="form-group form-action">
+              <button type="submit" class="btn btn-primary" id="btn-search">
+                <span>Search Available</span>
+              </button>
+            </div>
+          </div>
+          <div id="search-error" class="inline-error" style="display: none;"></div>
+        </form>
+      </div>
+
+      <!-- Search Results Section -->
+      <div class="results-section">
+        <div class="section-title-bar">
+          <h3 id="search-results-heading">Available Apartments</h3>
+          <span id="search-results-count" class="badge badge-info">Select dates above</span>
+        </div>
+        <div id="search-results-grid" class="cards-grid">
+          <!-- Dynamically populated via JS -->
+          <div class="empty-state">
+            <span class="empty-icon">📅</span>
+            <p>Choose your check-in and check-out dates above and click <strong>Search Available</strong> to view places.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 2: Manage Apartments (Host View)                             -->
+    <!-- ================================================================= -->
+    <section id="view-apartments" class="tab-view" role="tabpanel" aria-labelledby="tab-apartments">
+      <div class="panel-card">
+        <div class="panel-header action-bar">
+          <div>
+            <h2>Apartment Catalog</h2>
+            <p>Manage your rental properties, update pricing and details, and view current listings.</p>
+          </div>
+          <button class="btn btn-success" id="btn-open-add-apartment">
+            <span>+ Add New Apartment</span>
+          </button>
+        </div>
+
+        <div id="apartments-list-grid" class="cards-grid">
+          <!-- Dynamically populated via JS -->
+          <div class="loading-state">Loading apartments...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================= -->
+    <!-- TAB 3: Manage Bookings (Reservations View)                        -->
+    <!-- ================================================================= -->
+    <section id="view-bookings" class="tab-view" role="tabpanel" aria-labelledby="tab-bookings">
+      <div class="panel-card">
+        <div class="panel-header action-bar">
+          <div>
+            <h2>Reservations & Bookings</h2>
+            <p>View all guest bookings, modify reservation dates, or cancel stays to release calendar dates.</p>
+          </div>
+          <div class="filter-group">
+            <label for="filter-booking-apartment">Filter by Apartment:</label>
+            <select id="filter-booking-apartment" class="select-input">
+              <option value="">All Apartments</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="bookings-table">
+            <thead>
+              <tr>
+                <th>Booking ID</th>
+                <th>Apartment</th>
+                <th>Guest</th>
+                <th>Stay Dates</th>
+                <th>Nights</th>
+                <th>Total Price</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="bookings-table-body">
+              <!-- Dynamically populated via JS -->
+              <tr>
+                <td colspan="8" class="text-center">Loading bookings...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================================================================= -->
+  <!-- MODAL: Create Booking                                             -->
+  <!-- ================================================================= -->
+  <div id="modal-booking" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modal-booking-title">Book Apartment</h3>
+        <button class="btn-close" data-close-modal="modal-booking">&times;</button>
+      </div>
+      <form id="form-create-booking">
+        <input type="hidden" id="book-apartment-id" name="apartment_id">
+        <div class="modal-body">
+          <div class="apartment-summary-box" id="book-apartment-summary">
+            <!-- Dynamically populated -->
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="book-start-date">Check-in Date <span class="required">*</span></label>
+              <input type="date" id="book-start-date" name="start_date" required>
+            </div>
+            <div class="form-group">
+              <label for="book-end-date">Check-out Date <span class="required">*</span></label>
+              <input type="date" id="book-end-date" name="end_date" required>
+            </div>
+          </div>
+
+          <div class="price-calculation-box" id="book-price-box">
+            <div class="calc-row">
+              <span>Duration:</span>
+              <strong id="book-duration">0 nights</strong>
+            </div>
+            <div class="calc-row">
+              <span>Rate per night:</span>
+              <span id="book-rate">€0.00</span>
+            </div>
+            <div class="calc-row total-row">
+              <span>Total Price:</span>
+              <strong id="book-total-price" class="text-success">€0.00</strong>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="book-guest-name">Guest Full Name <span class="required">*</span></label>
+            <input type="text" id="book-guest-name" name="guest_name" placeholder="e.g. Elena Rossi" required minlength="1" maxlength="255">
+          </div>
+
+          <div class="form-group">
+            <label for="book-guest-email">Guest Email Address <span class="required">*</span></label>
+            <input type="email" id="book-guest-email" name="guest_email" placeholder="e.g. elena.rossi@example.com" required>
+          </div>
+
+          <div id="modal-booking-error" class="alert alert-danger" style="display: none;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-booking">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-booking">Confirm Reservation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- MODAL: Add New Apartment                                          -->
+  <!-- ================================================================= -->
+  <div id="modal-add-apartment" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Add New Apartment Listing</h3>
+        <button class="btn-close" data-close-modal="modal-add-apartment">&times;</button>
+      </div>
+      <form id="form-add-apartment">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="add-apt-title">Listing Title <span class="required">*</span></label>
+            <input type="text" id="add-apt-title" name="title" placeholder="e.g. Sunny Alpine Studio" required maxlength="255">
+          </div>
+
+          <div class="form-group">
+            <label for="add-apt-address">Address <span class="required">*</span></label>
+            <input type="text" id="add-apt-address" name="address" placeholder="e.g. Piazza Walther 4, Bolzano" required maxlength="255">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="add-apt-price">Price per Night (€) <span class="required">*</span></label>
+              <input type="number" id="add-apt-price" name="price_per_night" min="1" step="0.5" placeholder="110.00" required>
+            </div>
+            <div class="form-group">
+              <label for="add-apt-guests">Max Guests <span class="required">*</span></label>
+              <input type="number" id="add-apt-guests" name="max_guests" min="1" max="100" value="2" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="add-apt-description">Description (Optional)</label>
+            <textarea id="add-apt-description" name="description" rows="3" placeholder="Describe the apartment, amenities, location..."></textarea>
+          </div>
+
+          <div id="modal-add-apt-error" class="alert alert-danger" style="display: none;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-add-apartment">Cancel</button>
+          <button type="submit" class="btn btn-success" id="btn-submit-add-apt">Save Listing</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- MODAL: Edit Apartment                                             -->
+  <!-- ================================================================= -->
+  <div id="modal-edit-apartment" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Edit Apartment Listing</h3>
+        <button class="btn-close" data-close-modal="modal-edit-apartment">&times;</button>
+      </div>
+      <form id="form-edit-apartment">
+        <input type="hidden" id="edit-apt-id" name="id">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="edit-apt-title">Listing Title <span class="required">*</span></label>
+            <input type="text" id="edit-apt-title" name="title" required maxlength="255">
+          </div>
+
+          <div class="form-group">
+            <label for="edit-apt-address">Address <span class="required">*</span></label>
+            <input type="text" id="edit-apt-address" name="address" required maxlength="255">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="edit-apt-price">Price per Night (€) <span class="required">*</span></label>
+              <input type="number" id="edit-apt-price" name="price_per_night" min="1" step="0.5" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-apt-guests">Max Guests <span class="required">*</span></label>
+              <input type="number" id="edit-apt-guests" name="max_guests" min="1" max="100" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-apt-description">Description</label>
+            <textarea id="edit-apt-description" name="description" rows="3"></textarea>
+          </div>
+
+          <div id="modal-edit-apt-error" class="alert alert-danger" style="display: none;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-edit-apartment">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-edit-apt">Update Listing</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- MODAL: Modify / Transfer Booking                                  -->
+  <!-- ================================================================= -->
+  <div id="modal-modify-booking" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Modify Reservation</h3>
+        <button class="btn-close" data-close-modal="modal-modify-booking">&times;</button>
+      </div>
+      <form id="form-modify-booking">
+        <input type="hidden" id="modify-booking-id">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="modify-booking-apartment">Apartment Listing</label>
+            <select id="modify-booking-apartment" class="select-input">
+              <!-- Populated via JS -->
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="modify-booking-start">Check-in Date <span class="required">*</span></label>
+              <input type="date" id="modify-booking-start" required>
+            </div>
+            <div class="form-group">
+              <label for="modify-booking-end">Check-out Date <span class="required">*</span></label>
+              <input type="date" id="modify-booking-end" required>
+            </div>
+          </div>
+
+          <div class="price-calculation-box">
+            <div class="calc-row">
+              <span>Updated Duration:</span>
+              <strong id="modify-duration">0 nights</strong>
+            </div>
+            <div class="calc-row total-row">
+              <span>Recalculated Total Price:</span>
+              <strong id="modify-total-price" class="text-success">€0.00</strong>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="modify-booking-name">Guest Full Name <span class="required">*</span></label>
+            <input type="text" id="modify-booking-name" required maxlength="255">
+          </div>
+
+          <div class="form-group">
+            <label for="modify-booking-email">Guest Email Address <span class="required">*</span></label>
+            <input type="email" id="modify-booking-email" required>
+          </div>
+
+          <div id="modal-modify-booking-error" class="alert alert-danger" style="display: none;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-modify-booking">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-modify-booking">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Application Logic -->
+  <script src="/static/app.js"></script>
+</body>
+</html>

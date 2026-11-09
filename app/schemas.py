@@ -78,13 +78,32 @@ class ApartmentBase(BaseModel):
 class ApartmentCreate(ApartmentBase):
     """Payload for creating a new apartment listing."""
 
-    pass
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "example": {
+                "title": "Sunny Alpine Studio",
+                "description": "Cozy studio near Waltherplatz with mountain views.",
+                "address": "Piazza Walther 4, Bolzano",
+                "price_per_night": 110.0,
+                "max_guests": 2,
+            }
+        },
+    )
 
 
 class ApartmentUpdate(BaseModel):
     """Partial update payload: only the fields sent in the request body are changed."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "example": {
+                "title": "Sunny Alpine Studio (Renovated)",
+                "price_per_night": 125.0,
+            }
+        },
+    )
 
     title: Optional[str] = Field(None, min_length=1, max_length=APARTMENT_TEXT_MAX_LENGTH)
     description: Optional[str] = Field(
@@ -121,7 +140,20 @@ class ApartmentUpdate(BaseModel):
 class ApartmentResponse(BaseModel):
     """Serialized apartment response."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
+                "title": "Sunny Alpine Studio",
+                "description": "Cozy studio near Waltherplatz with mountain views.",
+                "address": "Piazza Walther 4, Bolzano",
+                "price_per_night": 110.0,
+                "max_guests": 2,
+                "created_at": "2026-11-09T10:00:00Z",
+            }
+        },
+    )
 
     id: str
     title: str
@@ -157,6 +189,19 @@ class BookingCreate(BookingBase):
 
     apartment_id: str = Field(..., min_length=1, description="ID of the apartment being booked")
 
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "example": {
+                "apartment_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
+                "guest_name": "Elena Rossi",
+                "guest_email": "elena.rossi@example.com",
+                "start_date": "2026-12-01",
+                "end_date": "2026-12-05",
+            }
+        },
+    )
+
     @model_validator(mode="after")
     def validate_date_order(self) -> "BookingCreate":
         """Ensure check-in date is strictly before check-out date."""
@@ -168,7 +213,15 @@ class BookingCreate(BookingBase):
 class BookingUpdate(BaseModel):
     """Payload for updating an existing booking."""
 
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "example": {
+                "end_date": "2026-12-06",
+                "guest_email": "elena.updated@example.com",
+            }
+        },
+    )
 
     apartment_id: Optional[str] = Field(None, min_length=1, description="Move booking to a different apartment ID")
     guest_name: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -198,4 +251,67 @@ class BookingResponse(BaseModel):
     status: BookingStatus
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "example": {
+                "id": "7fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "apartment_id": "c9bf9e57-1685-4c89-bafb-ff5af830be8a",
+                "guest_name": "Elena Rossi",
+                "guest_email": "elena.rossi@example.com",
+                "start_date": "2026-12-01",
+                "end_date": "2026-12-05",
+                "total_price": 440.0,
+                "status": "CONFIRMED",
+                "created_at": "2026-11-09T10:15:00Z",
+            }
+        },
+    )
+
+
+# -----------------------------------------------------------------------------
+# Error Schemas (for OpenAPI Documentation)
+# -----------------------------------------------------------------------------
+
+
+class ErrorResponse(BaseModel):
+    """Standard error response payload."""
+
+    detail: str = Field(..., description="Human-readable error explanation")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "detail": "Apartment is not available for the requested date range: 2026-12-01 to 2026-12-05. Collides with an existing booking."
+            }
+        }
+    )
+
+
+class ValidationErrorItem(BaseModel):
+    """Validation error item detail."""
+
+    loc: list[str | int] = Field(..., description="Path to the invalid field")
+    msg: str = Field(..., description="Validation failure explanation")
+    type: str = Field(..., description="Error classification identifier")
+
+
+class ValidationErrorResponse(BaseModel):
+    """FastAPI request validation error response payload (HTTP 422)."""
+
+    detail: list[ValidationErrorItem] = Field(..., description="List of field-level validation errors")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "detail": [
+                    {
+                        "loc": ["body", "price_per_night"],
+                        "msg": "Input should be greater than 0",
+                        "type": "greater_than",
+                    }
+                ]
+            }
+        }
+    )

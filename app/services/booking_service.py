@@ -56,12 +56,18 @@ def _commit_booking(db: Session, apartment_id: str) -> None:
     """
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
+        target = db.get(Apartment, apartment_id)
+        if not target:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Apartment with ID '{apartment_id}' not found.",
+            ) from None
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Apartment with ID '{apartment_id}' not found.",
-        ) from None
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Database constraint violation while persisting booking.",
+        ) from exc
 
 
 def create_booking(db: Session, data: BookingCreate) -> Booking:
@@ -124,8 +130,8 @@ def get_all_bookings(
 ) -> List[Booking]:
     """Retrieve all bookings with pagination, optionally filtered by apartment ID."""
     query = db.query(Booking)
-    if apartment_id:
-        query = query.filter(Booking.apartment_id == apartment_id)
+    if apartment_id and apartment_id.strip():
+        query = query.filter(Booking.apartment_id == apartment_id.strip())
     return query.order_by(Booking.start_date.asc()).offset(offset).limit(limit).all()
 
 
