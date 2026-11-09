@@ -1,5 +1,8 @@
 # Apartment Booking System
 
+[![Build & Unit Tests](https://github.com/rmnfdrzq/apartment-booking/actions/workflows/tests.yml/badge.svg)](https://github.com/rmnfdrzq/apartment-booking/actions/workflows/tests.yml)
+[![Coverage Gate](https://github.com/rmnfdrzq/apartment-booking/actions/workflows/coverage.yml/badge.svg)](https://github.com/rmnfdrzq/apartment-booking/actions/workflows/coverage.yml)
+
 A full-stack web application and RESTful backend service for managing apartment listings, searching date-range availability, and handling reservations with strict collision prevention. Built for the **Agile Software Development** course (Project 1, Free University of Bozen-Bolzano).
 
 ---
@@ -24,6 +27,7 @@ A full-stack web application and RESTful backend service for managing apartment 
 - [14. Running Automated Tests & Coverage](#14-running-automated-tests--coverage)
 - [15. Database Management & Reset](#15-database-management--reset)
 - [16. Checkpoint Compliance Checklist](#16-checkpoint-compliance-checklist)
+- [17. Continuous Integration (GitHub Actions & GitLab CI)](#17-continuous-integration-github-actions--gitlab-ci)
 
 ---
 
@@ -261,6 +265,12 @@ For a fresh checkout, run the entire application, database, and interactive web 
 
 ### Exact Commands for Fresh Checkout:
 
+0. **Get the Code:**
+   ```bash
+   git clone https://github.com/rmnfdrzq/apartment-booking.git
+   cd apartment-booking
+   ```
+
 1. **Start the Application in the Background (with Live Updates):**
    ```bash
    docker compose up --build -d
@@ -279,7 +289,7 @@ For a fresh checkout, run the entire application, database, and interactive web 
    # Or from a cold container run:
    docker compose run --rm web pytest
    ```
-   *Executes all 165 unit, integration, and UI tests within the Docker container environment.*
+   *Executes the unit, integration, and UI tests inside the container. The two demo-script tests are skipped there because the slim image has no `curl`; all others pass.*
 
 4. **Stop the Application (Preserving Database Data):**
    ```bash
@@ -764,7 +774,7 @@ The application guarantees that all catalog listings and reservations survive ap
 
 ## 14. Running Automated Tests & Coverage
 
-The test suite contains **165 automated tests** covering schemas, services, overlap conflict detection, REST APIs, static assets, web UI HTML delivery, live updates, and OpenAPI documentation integrity.
+The test suite contains **170+ automated tests** covering schemas, services, overlap conflict detection, REST APIs, static assets, web UI HTML delivery, live updates, and OpenAPI documentation integrity.
 
 ### Run Tests Locally (Host Machine):
 ```bash
@@ -784,7 +794,7 @@ docker compose run --rm web pytest
 ```
 
 ### Test Suite Highlights:
-- **165 Passed Tests** with **97% line & branch coverage**.
+- **All tests passing** with **~91% line & branch coverage** (CI fails below 80%, see [Section 17](#17-continuous-integration-github-actions--gitlab-ci)).
 - **In-Memory SQLite Isolation:** Test database uses `StaticPool` in memory; running `pytest` will **never touch or pollute** `./data/apartments.db`.
 - **Comprehensive Scenarios:** Covers valid workflows, edge cases, negative numbers, extreme date windows, same-day turnover, self-collision exclusion on edits, and full web UI form elements.
 
@@ -813,7 +823,58 @@ Removes all containers, internal networks, and the `apartment_data` persistent v
 | **Web Application with Forms for Existing Workflows** | Single-page responsive web app at `/` with forms for searching, booking, adding/editing apartments, and modifying/cancelling reservations ([Section 10](#10--interactive-web-application-forms--workflows)). | Open [http://localhost:8000](http://localhost:8000) in browser; run `tests/test_web_ui.py`. | ✅ |
 | **Resource-Oriented REST API** | Semantic URLs (`/apartments`, `/bookings`), standard HTTP methods (`GET`, `POST`, `PUT`, `DELETE`), clean JSON bodies, standard status codes (`200`, `201`, `204`, `400`, `404`, `409`, `422`) ([Section 11](#11--resource-oriented-rest-api--openapi-specification)). | Read Section 11; explore `/docs`. | ✅ |
 | **Documented OpenAPI Specification** | Enriched OpenAPI 3.1 documentation with parameters, realistic examples, and error schemas (`400`, `404`, `409`, `422`). Exported to `docs/openapi.json` and `docs/openapi.yaml`. | Open [http://localhost:8000/docs](http://localhost:8000/docs); run `tests/test_openapi.py`. | ✅ |
-| **Unit & Integration Tests for Key Rules** | 165 automated tests (97% branch coverage) testing date math, overlap formulas, cancellation release, deletion protection, and web UI. | Run `pytest -v` or `docker compose exec web pytest`. | ✅ |
+| **Unit & Integration Tests for Key Rules** | 170+ automated tests (~91% line & branch coverage) testing date math, overlap formulas, cancellation release, deletion protection, and web UI. | Run `pytest -v` or `docker compose exec web pytest`. | ✅ |
 | **Persistent Docker Volumes for Databases** | Docker Compose configured with named volume `apartment_data:/app/data` backing SQLite ([Section 8](#8--docker-quickstart-fresh-checkout-commands), [Section 13](#13-verifying-persistent-storage-across-restarts--docker-volumes)). | Run `docker compose down` then `docker compose up -d` and inspect data. | ✅ |
 | **Verified Workflows Started with Docker Compose** | Multi-platform container based on `python:3.12-slim` with automated healthcheck and complete workflow support. | Run `docker compose up --build -d` and try web app or curl. | ✅ |
 | **Documented Exact Commands & Web Address** | Exact commands to start, stop, and test from a fresh checkout documented alongside web address `http://localhost:8000` ([Section 8](#8--docker-quickstart-fresh-checkout-commands)). | Follow Section 8 from a clean shell. | ✅ |
+
+---
+
+## 17. Continuous Integration (GitHub Actions & GitLab CI)
+
+Every push and every pull request (merge request on GitLab) runs two workflows automatically.
+
+| Workflow | File | What it checks | Fails when |
+| :--- | :--- | :--- | :--- |
+| **Build & Unit Tests** | [`.github/workflows/tests.yml`](.github/workflows/tests.yml) | Installs dependencies, checks the app and its API schema load, runs the full test suite; builds the **Docker image**, runs the tests **inside the image**, starts a container and calls `/health` | Any test fails, the image does not build, or the container is not healthy |
+| **Coverage Gate** | [`.github/workflows/coverage.yml`](.github/workflows/coverage.yml) | Runs the tests with coverage measurement (line + branch) | Coverage of `app/` drops below **80 %** (currently ~91 %) |
+
+### Where to see the results
+- **Status:** the two badges at the top of this README, and the ✅/❌ next to each commit and pull request.
+- **Details:** GitHub → **Actions** tab → open a run. Each job writes a summary table (tests passed/failed/skipped, failing test names, coverage per file, Docker image size) produced by [`scripts/ci_summary.py`](scripts/ci_summary.py).
+- **Reports to download:** at the bottom of a run page, **Artifacts**: `unit-test-report` (JUnit XML) and `coverage-report` (HTML + XML; open `coverage-html/index.html`).
+
+### Run the same checks locally
+```bash
+source .venv/bin/activate
+python -m pytest --no-cov                         # Workflow 1: unit tests
+python -m pytest --cov=app --cov-fail-under=80    # Workflow 2: coverage gate
+docker build -t apartment-booking:ci . && docker run --rm apartment-booking:ci python -m pytest --no-cov   # tests inside the image
+```
+
+### Demonstrating a failing run
+1. Break one assertion on a branch: in `tests/test_overlap.py`, test `test_overlap_exact_match`, change `assert response.status_code == 409` to `== 201` (the test now wrongly expects a double booking to succeed), then commit and push.
+2. **Build & Unit Tests** turns red (❌): the summary lists the failing test. Copy the run link.
+3. Undo the change with `git revert HEAD` and push: both workflows are green again (✅). Copy the run link.
+
+### GitLab CI (university GitLab)
+The same checks are defined for GitLab in [`.gitlab-ci.yml`](.gitlab-ci.yml):
+
+| Job | Stage | Same as |
+| :--- | :--- | :--- |
+| `unit-tests` | test | Build & Unit Tests (tests) |
+| `docker-image` | build | Build & Unit Tests (Docker image) |
+| `coverage-check` | quality | Coverage Gate |
+
+1. In the university GitLab: **New project → Import project → Repository by URL**, URL `https://github.com/rmnfdrzq/apartment-booking.git`.
+2. The pipeline starts by itself; open **Build → Pipelines**. Test results are in the pipeline's **Tests** tab, coverage is shown on the `coverage-check` job.
+3. If `docker-image` fails with a message about `privileged` mode or connecting to `docker:2375`, the university runner does not allow Docker-in-Docker. Replace the job with Kaniko, which needs no privileges:
+   ```yaml
+   docker-image:
+     stage: build
+     image:
+       name: gcr.io/kaniko-project/executor:v1.23.2-debug
+       entrypoint: [""]
+     script:
+       - /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile "$CI_PROJECT_DIR/Dockerfile" --no-push
+   ```

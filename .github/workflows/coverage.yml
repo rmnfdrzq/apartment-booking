@@ -1,0 +1,60 @@
+# Workflow 2: additional check — test coverage must stay above a minimum.
+name: Coverage Gate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COVERAGE_MIN: 80
+
+jobs:
+  coverage:
+    name: Coverage (minimum 80 %)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Failing tests are reported by the "Build & Unit Tests" workflow; this workflow only judges coverage.
+      - name: Measure coverage
+        run: |
+          python -m pytest -q \
+            --cov=app --cov-report=term-missing \
+            --cov-report=xml:reports/coverage.xml --cov-report=html:reports/coverage-html \
+            || echo "::warning::Some tests failed (see the Build & Unit Tests workflow); coverage is still measured."
+
+      - name: Check coverage minimum (${{ env.COVERAGE_MIN }} %)
+        run: python -m coverage report --fail-under="$COVERAGE_MIN" --format=total
+
+      - name: Show coverage
+        if: always()
+        run: python scripts/ci_summary.py --coverage reports/coverage.xml --threshold "$COVERAGE_MIN" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: reports/
+          if-no-files-found: warn

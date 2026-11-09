@@ -1,0 +1,108 @@
+# GitLab CI for the Apartment Booking app — same checks as .github/workflows/:
+#   Workflow 1 "Build & Unit Tests": unit-tests + docker-image
+#   Workflow 2 "Coverage Gate":      coverage-check (fails below 80 %)
+# Test results appear under the pipeline's "Tests" tab, coverage on the job and in merge requests.
+
+workflow:
+  rules:
+    # One pipeline per change: merge request pipelines for MRs, branch pipelines otherwise.
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+stages:
+  - test
+  - build
+  - quality
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  COVERAGE_MIN: "80"
+
+.python:
+  image: python:3.12
+  cache:
+    key: pip-$CI_COMMIT_REF_SLUG
+    paths:
+      - .cache/pip
+  before_script:
+    - python -m pip install --upgrade pip
+    - pip install -r requirements.txt
+
+# ---- Workflow 1: build & unit tests --------------------------------------------
+
+unit-tests:
+  extends: .python
+  stage: test
+  timeout: 15m
+  script:
+    - python -c "from app.main import app; print(len(app.openapi()['paths']), 'API paths')"
+    - python -m pytest --no-cov --junitxml=reports/unit-tests.xml
+  after_script:
+    - python scripts/ci_summary.py --junit reports/unit-tests.xml || true
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - reports/unit-tests.xml
+    reports:
+      junit: reports/unit-tests.xml
+
+docker-image:
+  # Docker-in-Docker needs a runner with privileged = true.
+  # If the university runner refuses it, use the Kaniko job described in README (section "GitLab CI").
+  stage: build
+  timeout: 15m
+  image: docker:27
+  services:
+    - name: docker:27-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker build --tag apartment-booking:ci .
+    - docker run --rm apartment-booking:ci python -m pytest --no-cov -p no:cacheprovider
+    - docker run -d --name apartment-booking apartment-booking:ci
+    - |
+      healthy=no
+      for _ in $(seq 1 30); do
+        if docker exec apartment-booking python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health').read().decode())"; then
+          healthy=yes
+          break
+        fi
+        sleep 1
+      done
+      if [ "$healthy" != yes ]; then docker logs apartment-booking; exit 1; fi
+    - docker image ls apartment-booking:ci
+  after_script:
+    - docker rm -f apartment-booking || true
+
+# ---- Workflow 2: coverage gate --------------------------------------------------
+
+coverage-check:
+  extends: .python
+  stage: quality
+  needs: []
+  timeout: 15m
+  script:
+    # Failing tests are reported by unit-tests; this job only judges coverage.
+    - >
+      python -m pytest -q
+      --cov=app --cov-report=term-missing
+      --cov-report=xml:reports/coverage.xml --cov-report=html:reports/coverage-html
+      || echo "Some tests failed (see the unit-tests job); coverage is still measured."
+    - python -m coverage report --fail-under="$COVERAGE_MIN" --format=total
+  after_script:
+    - python scripts/ci_summary.py --coverage reports/coverage.xml --threshold "$COVERAGE_MIN" || true
+  coverage: '/^TOTAL.+?(\d+(?:\.\d+)?)%$/'
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - reports/
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: reports/coverage.xml

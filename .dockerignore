@@ -13,3 +13,4 @@ data/*.sqlite
 data/*.sqlite3
 dev_plans/
 .DS_Store
+reports/
