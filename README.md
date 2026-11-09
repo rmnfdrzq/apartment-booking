@@ -1,6 +1,6 @@
-# Apartment Booking API
+# Apartment Booking System
 
-A headless, RESTful backend service for managing apartment listings, searching date-range availability, and handling reservations with strict collision prevention. Built for the **Agile Software Development** course (Project 1, Free University of Bozen-Bolzano).
+A full-stack web application and RESTful backend service for managing apartment listings, searching date-range availability, and handling reservations with strict collision prevention. Built for the **Agile Software Development** course (Project 1, Free University of Bozen-Bolzano).
 
 ---
 
@@ -13,15 +13,17 @@ A headless, RESTful backend service for managing apartment listings, searching d
 - [5. Technology Stack & Design Decisions](#5-technology-stack--design-decisions)
 - [6. Architecture & Database Persistence](#6-architecture--database-persistence)
 - [7. Project Directory Structure](#7-project-directory-structure)
-- [8. Quickstart Guide (3 Steps to Run)](#8-quickstart-guide-3-steps-to-run)
-- [9. Headless API Documentation (Swagger & OpenAPI)](#9-headless-api-documentation-swagger--openapi)
-- [10. 🎮 Demonstrating the System (Two Options)](#10--demonstrating-the-system-two-options)
+- [8. 🚀 Docker Quickstart (Fresh Checkout Commands)](#8--docker-quickstart-fresh-checkout-commands)
+- [9. 💻 Local Quickstart Guide (Virtualenv)](#9--local-quickstart-guide-virtualenv)
+- [10. 🌐 Interactive Web Application (Forms & Workflows)](#10--interactive-web-application-forms--workflows)
+- [11. 📘 Resource-Oriented REST API & OpenAPI Specification](#11--resource-oriented-rest-api--openapi-specification)
+- [12. 🎮 Demonstrating the System via CLI (Two Options)](#12--demonstrating-the-system-via-cli-two-options)
   - [Option 1: Automated Demo Script (`scripts/demo.sh`)](#option-1-automated-demo-script-scriptsdemosh)
   - [Option 2: Step-by-Step Manual cURL Walkthrough (Beginner-Friendly)](#option-2-step-by-step-manual-curl-walkthrough-beginner-friendly)
-- [11. Verifying Data Persistence Across Server Restarts](#11-verifying-data-persistence-across-server-restarts)
-- [12. Running Automated Tests & Coverage](#12-running-automated-tests--coverage)
-- [13. Database Management & Reset](#13-database-management--reset)
-- [14. Checkpoint 1 Compliance Checklist](#14-checkpoint-1-compliance-checklist)
+- [13. Verifying Persistent Storage Across Restarts & Docker Volumes](#13-verifying-persistent-storage-across-restarts--docker-volumes)
+- [14. Running Automated Tests & Coverage](#14-running-automated-tests--coverage)
+- [15. Database Management & Reset](#15-database-management--reset)
+- [16. Checkpoint Compliance Checklist](#16-checkpoint-compliance-checklist)
 
 ---
 
@@ -188,6 +190,9 @@ classDiagram
 ```text
 apartment-booking/
 ├── README.md               # Complete project documentation & demonstration guide
+├── Dockerfile              # Production Python 3.12-slim container definition
+├── docker-compose.yml      # Orchestration with named persistent volume (apartment_data)
+├── .dockerignore           # Ignored files for lean Docker build context
 ├── pyproject.toml          # Pytest, coverage, and warning suppression settings
 ├── requirements.txt        # Pinned Python dependencies
 ├── data/
@@ -198,16 +203,25 @@ apartment-booking/
 │   ├── part1-apartments/plan.md # Plan for apartment catalog CRUD
 │   ├── part2-bookings/plan.md # Plan for booking lifecycle & overlap engine
 │   ├── part3-search/plan.md # Plan for date range availability search
-│   └── part4-demo/plan.md # Plan for end-to-end demo & Checkpoint 1 sign-off
+│   ├── part4-demo/plan.md # Plan for end-to-end demo & Checkpoint 1 sign-off
+│   └── checkpoint-2-web-docker/plan.md # Plan for Web UI, Docker, & OpenAPI
+├── docs/
+│   ├── openapi.json        # Enriched OpenAPI 3.1 specification (JSON format)
+│   └── openapi.yaml        # Enriched OpenAPI 3.1 specification (YAML format)
 ├── scripts/
-│   └── demo.sh             # One-command end-to-end demo (all user stories + persistence)
+│   ├── demo.sh             # One-command CLI demo (all user stories + persistence)
+│   └── export_openapi.py   # Automated script to export OpenAPI JSON & YAML
 ├── app/
 │   ├── __init__.py
-│   ├── main.py             # FastAPI entrypoint, lifespan startup, & /health route
+│   ├── main.py             # FastAPI entrypoint, lifespan startup, & static mounts
 │   ├── config.py           # Application settings (DB path, metadata)
 │   ├── database.py         # SQLAlchemy engine, PRAGMA listeners, & get_db dependency
 │   ├── models.py           # Database entities (Apartment, Booking, BookingStatus)
-│   ├── schemas.py          # Pydantic validation schemas
+│   ├── schemas.py          # Pydantic schemas with examples & error structures
+│   ├── static/             # Single-Page Web Application Frontend
+│   │   ├── index.html      # Responsive HTML UI with forms and modals
+│   │   ├── styles.css      # Design-token modern CSS styles
+│   │   └── app.js          # Client-side workflows & Fetch API logic
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── apartment_service.py # Apartment catalog rules & availability search
@@ -219,7 +233,7 @@ apartment-booking/
 └── tests/
     ├── __init__.py
     ├── conftest.py         # In-memory SQLite fixtures with zero file pollution
-    ├── test_health.py      # Health check and root redirect tests
+    ├── test_health.py      # Health check and root serving tests
     ├── test_database.py    # Engine connection, PRAGMA, and settings tests
     ├── test_models_schemas.py # Schema validation and ORM persistence tests
     ├── test_apartment_schemas.py # US1 apartment input validation tests
@@ -228,12 +242,59 @@ apartment-booking/
     ├── test_search.py      # US3 availability search tests
     ├── test_demo_script.py # End-to-end test running scripts/demo.sh
     ├── test_bookings.py    # US2 booking lifecycle, pricing, and error handling tests
-    └── test_overlap.py     # US4 comprehensive overlap collision tests
+    ├── test_overlap.py     # US4 comprehensive overlap collision tests
+    ├── test_web_ui.py      # Automated tests for HTML single-page app & static assets
+    └── test_openapi.py     # OpenAPI schema validation & documentation tests
 ```
 
 ---
 
-## 8. Quickstart Guide (3 Steps to Run)
+## 8. 🚀 Docker Quickstart (Fresh Checkout Commands)
+
+For a fresh checkout, run the entire application, database, and interactive web interface in isolated containers with persistent storage using Docker Compose.
+
+### App Web Address & Documentation URLs:
+- 🌐 **Web Application UI:** [http://localhost:8000](http://localhost:8000)
+- 📘 **Interactive Swagger UI (OpenAPI 3.1):** [http://localhost:8000/docs](http://localhost:8000/docs)
+- 📕 **ReDoc Documentation:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- 📄 **Raw OpenAPI Spec:** [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json)
+
+### Exact Commands for Fresh Checkout:
+
+1. **Start the Application in the Background:**
+   ```bash
+   docker compose up --build -d
+   ```
+   *Builds the container from `python:3.12-slim`, mounts the persistent volume `apartment_data`, runs startup table migrations, and starts Uvicorn on port `8000`.*
+
+2. **Verify Container Health & Running Status:**
+   ```bash
+   docker compose ps
+   ```
+   *The container status will show `Up (healthy)` once the internal urllib healthcheck succeeds.*
+
+3. **Run Automated Test Suite Inside Container:**
+   ```bash
+   docker compose run --rm web pytest
+   ```
+   *Executes all 163 unit, integration, and UI tests within the Docker container environment.*
+
+4. **Stop the Application (Preserving Database Data):**
+   ```bash
+   docker compose down
+   ```
+   *Safely stops the container while keeping your database completely preserved in the named Docker volume `apartment_data`.*
+
+5. **Stop and Reset Database Volume (Fresh Clean State):**
+   ```bash
+   docker compose down -v
+   ```
+
+---
+
+## 9. 💻 Local Quickstart Guide (Virtualenv)
+
+If you prefer running directly on your local machine without Docker:
 
 ### Step 1: Clone Repository
 ```bash
@@ -255,25 +316,124 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Once running:
-- **API Base URL:** `http://127.0.0.1:8000`
-- **Interactive Documentation:** `http://127.0.0.1:8000/docs`
+- **Web App:** [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- **API Docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **Database file:** Automatically created at `./data/apartments.db`.
 
 ---
 
-## 9. Headless API Documentation (Swagger & OpenAPI)
+## 10. 🌐 Interactive Web Application (Forms & Workflows)
 
-To satisfy **Shared Project Constraint 1** (*documented API callable without a GUI*), FastAPI automatically exposes machine-readable and browser-inspectable documentation:
+The application provides an interactive single-page web interface served at **[http://localhost:8000](http://localhost:8000)** that allows users to complete all rental workflows using dedicated forms without command-line input.
 
-| Documentation Interface | URL | Description |
-| :--- | :--- | :--- |
-| **Interactive Swagger UI** | [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) | Allows exploring endpoints, request schemas, status codes, and trying queries directly. |
-| **ReDoc Documentation** | [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc) | Clean, readable reference documentation. |
-| **Raw OpenAPI 3.1 JSON** | [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json) | Standards-compliant OpenAPI JSON schema for headless clients. |
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ 🏠 Apartment Booking — Urban Short-Stay Rentals                        │
+├────────────────────────────────────────────────────────────────────────┤
+│ [🔍 Search & Book]     [🏢 Apartments]     [📅 Bookings]    [📘 API Docs]│
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  FIND AN APARTMENT FOR YOUR STAY                                       │
+│  ┌────────────────────┐  ┌──────────────────┐  ┌────────────────────┐  │
+│  │ Check-in: 2026-11-10│  │Check-out: 2026-11-14│  │ [Search Available] │  │
+│  └────────────────────┘  └──────────────────┘  └────────────────────┘  │
+│                                                                        │
+│  Available Apartments (2 available for 4 nights):                      │
+│  ┌──────────────────────────────┐  ┌──────────────────────────────┐    │
+│  │ Alpine View Studio    ID #a9 │  │ City Center Loft      ID #b3 │    │
+│  │ 📍 Via Roma 10, Bolzano      │  │ 📍 Piazza Walther 4, Bolzano │    │
+│  │ 👥 Max 2 guests              │  │ 👥 Max 4 guests              │    │
+│  │ €120.00 / night              │  │ €150.00 / night              │    │
+│  │ Total (4 nights): €480.00    │  │ Total (4 nights): €600.00    │    │
+│  │ [Book This Stay]             │  │ [Book This Stay]             │    │
+│  └──────────────────────────────┘  └──────────────────────────────┘    │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Workflow 1: Date Availability Search & Instant Booking (Guest)
+1. **Search Available Stays:**
+   - Choose check-in and check-out dates via the date inputs.
+   - Click **Search Available**. The system queries `/apartments/search` and renders cards for all properties with guaranteed zero overlapping reservations.
+   - Each card dynamically displays the nightly rate and the total stay cost ($nights \times rate$).
+2. **Instant Reservation Form (Modal):**
+   - Click **Book This Stay** on an apartment card.
+   - The booking modal appears, pre-populated with your chosen dates and live duration and price recalculation.
+   - Enter guest full name and guest email.
+   - Click **Confirm Reservation**. The booking is sent via `POST /bookings`.
+   - On success, a confirmation toast notification pops up with the reservation ID and total price. If another guest books overlapping dates concurrently, a clear conflict error banner is displayed.
+
+### Workflow 2: Apartment Catalog Management (Host)
+1. Navigate to the **Apartments** tab.
+2. **Add New Listing:**
+   - Click **+ Add New Apartment**.
+   - Fill in Title, Address, Price per Night (€), Max Guests, and Description.
+   - Click **Save Listing** to create the apartment via `POST /apartments`.
+3. **Edit Listing:**
+   - Click **✏ Edit** on any card.
+   - Modify pricing, address, capacity, or description.
+   - Click **Update Listing** to commit changes via `PUT /apartments/{id}`.
+4. **Delete Listing with Protection:**
+   - Click **🗑 Delete** on any card.
+   - If the property has active bookings, the system catches the `409 Conflict` and informs the host: *"Cannot delete apartment with active reservations. Cancel or modify reservations first."*
+
+### Workflow 3: Reservations & Bookings Management (Guest / Host)
+1. Navigate to the **Bookings** tab.
+2. **Filter by Apartment:**
+   - Use the dropdown menu to inspect reservations for a specific apartment or view all bookings across your portfolio.
+3. **Modify Stay Dates or Transfer Apartment:**
+   - Click **Modify** next to any active booking.
+   - Adjust dates or select a different apartment. Duration and total price are automatically recalculated live.
+   - Submit **Save Changes** (`PUT /bookings/{id}`).
+4. **Cancel Stay to Release Calendar Dates:**
+   - Click **Cancel** next to a booking.
+   - The status is marked as `CANCELLED` (`POST /bookings/{id}/cancel`), and the dates are immediately released so other travelers can discover and book them.
 
 ---
 
-## 10. 🎮 Demonstrating the System (Two Options)
+## 11. 📘 Resource-Oriented REST API & OpenAPI Specification
+
+The backend is engineered as a clean, resource-oriented REST API adhering strictly to HTTP/1.1 semantics, standard JSON structures, and standard HTTP status codes:
+
+### Resource Endpoints Summary:
+| HTTP Method | URL Path | Status Code | Purpose |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/apartments` | `200 OK` | Paginated catalog of all apartments. |
+| `POST` | `/apartments` | `201 Created` | Create a new apartment listing. |
+| `GET` | `/apartments/{id}` | `200 OK` | Retrieve apartment listing by UUID. |
+| `PUT` | `/apartments/{id}` | `200 OK` | Full update of apartment attributes. |
+| `DELETE` | `/apartments/{id}` | `204 No Content` | Remove apartment listing (fails with `409` if active stays exist). |
+| `GET` | `/apartments/search` | `200 OK` | Search for apartments with zero overlapping bookings for requested dates. |
+| `GET` | `/bookings` | `200 OK` | Paginated list of reservations (filterable by apartment). |
+| `POST` | `/bookings` | `201 Created` | Create new reservation (fails with `409` on date overlap). |
+| `GET` | `/bookings/{id}` | `200 OK` | Retrieve reservation details by UUID. |
+| `PUT` | `/bookings/{id}` | `200 OK` | Update reservation dates/guest (fails with `409` on overlap). |
+| `POST` | `/bookings/{id}/cancel` | `200 OK` | Soft-cancel reservation and immediately free calendar dates. |
+| `GET` | `/health` | `200 OK` | Service operational health monitoring. |
+
+### Error Response Schemas & Status Codes:
+All error responses adhere to a consistent JSON structure:
+- `400 Bad Request`: Logical domain errors (e.g., check-out date before check-in date).
+- `404 Not Found`: Target apartment or booking UUID does not exist.
+- `409 Conflict`: Double-booking overlap detected or deletion blocked due to active stays.
+- `422 Unprocessable Entity`: Input validation error (missing required fields, negative rates, invalid emails).
+
+```json
+{
+  "detail": "Apartment 1 is already booked from 2026-11-01 to 2026-11-05"
+}
+```
+
+### Static OpenAPI Specification Files:
+- **JSON Format:** [`docs/openapi.json`](docs/openapi.json)
+- **YAML Format:** [`docs/openapi.yaml`](docs/openapi.yaml)
+- **Export Script:** To refresh the static spec files automatically:
+  ```bash
+  python scripts/export_openapi.py
+  ```
+
+---
+
+## 12. 🎮 Demonstrating the System via CLI (Two Options)
 
 For grading and verification, you can choose between two demonstration approaches:
 
@@ -538,72 +698,111 @@ curl -s -i -X DELETE "http://127.0.0.1:8000/apartments/${APT_ID}"
 
 ---
 
-## 11. Verifying Data Persistence Across Server Restarts
+## 13. Verifying Persistent Storage Across Restarts & Docker Volumes
 
-To prove **Shared Project Constraint 2** (*data survives application restarts*):
+The application guarantees that all catalog listings and reservations survive application restarts and container rebuilds.
 
-1. Note the existing booking from Step 7:
+### Scenario A: Docker Named Volume Persistence (`apartment_data`)
+
+1. Start the Docker containers:
    ```bash
-   curl -s -X GET http://127.0.0.1:8000/bookings
+   docker compose up --build -d
    ```
-2. Stop the running server in Terminal 1 by pressing `Ctrl + C`.
-3. Verify that the SQLite file exists on disk:
+2. Create an apartment listing:
    ```bash
-   ls -lh data/apartments.db
+   curl -s -X POST http://localhost:8000/apartments \
+     -H "Content-Type: application/json" \
+     -d '{"title": "Chalet Persistent", "address": "Via Roma 1, Bolzano", "price_per_night": 180.0, "max_guests": 4}'
    ```
-4. Restart the server in Terminal 1:
+3. Stop and remove the running container:
    ```bash
-   uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+   docker compose down
    ```
-5. Query the bookings list again in Terminal 2:
+4. Recreate and start the container afresh:
    ```bash
-   curl -s -X GET http://127.0.0.1:8000/bookings
+   docker compose up -d
    ```
-   **Result:** The previously created apartment and booking are still completely intact.
+5. Query the apartments catalog:
+   ```bash
+   curl -s http://localhost:8000/apartments
+   ```
+   **Result:** The listing created before container destruction is still fully present. The named volume `apartment_data` securely retained `/app/data/apartments.db`.
 
 ---
 
-## 12. Running Automated Tests & Coverage
+### Scenario B: Local Server SQLite File Persistence
 
-The project includes an automated test suite verifying all 4 user stories, input validation, and boundary conditions.
+1. Note existing bookings from your session:
+   ```bash
+   curl -s -X GET http://127.0.0.1:8000/bookings
+   ```
+2. Stop the local Uvicorn server by pressing `Ctrl + C`.
+3. Check the persistent SQLite file on disk:
+   ```bash
+   ls -lh data/apartments.db
+   ```
+4. Restart Uvicorn:
+   ```bash
+   uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+   ```
+5. Query the bookings list again:
+   ```bash
+   curl -s -X GET http://127.0.0.1:8000/bookings
+   ```
+   **Result:** All listings, confirmed stays, and cancelled records remain intact.
 
-### Run All Tests:
+---
+
+## 14. Running Automated Tests & Coverage
+
+The test suite contains **163 automated tests** covering schemas, services, overlap conflict detection, REST APIs, static assets, web UI HTML delivery, and OpenAPI documentation integrity.
+
+### Run Tests Locally (Host Machine):
 ```bash
 pytest -v
 ```
 
-### Run Tests with Coverage Report:
+### Run Tests with Full Coverage Report:
 ```bash
 pytest --cov=app --cov-report=term-missing
 ```
 
-### Key Test Properties:
-- **Fast Execution:** the whole suite runs in a few seconds.
-- **Zero Test Pollution:** Tests run against an in-memory SQLite database (`StaticPool`) and **never touch or pollute** `./data/apartments.db`.
-- **High Coverage (~98%):** unit tests (schemas, services), API integration tests for all four user stories, and an end-to-end test that runs `scripts/demo.sh` against a real server process.
+### Run Tests Inside Docker Container:
+```bash
+docker compose run --rm web pytest
+```
+
+### Test Suite Highlights:
+- **163 Passed Tests** with **98% line & branch coverage**.
+- **In-Memory SQLite Isolation:** Test database uses `StaticPool` in memory; running `pytest` will **never touch or pollute** `./data/apartments.db`.
+- **Comprehensive Scenarios:** Covers valid workflows, edge cases, negative numbers, extreme date windows, same-day turnover, self-collision exclusion on edits, and full web UI form elements.
 
 ---
 
-## 13. Database Management & Reset
+## 15. Database Management & Reset
 
-If you want to clear all data and start completely fresh:
+### Reset Local Database:
 ```bash
 rm data/apartments.db
 ```
-The next time Uvicorn starts, a pristine, empty database will be recreated automatically.
+The next time Uvicorn starts, an empty database will be recreated automatically.
+
+### Reset Docker Compose Persistent Volume:
+```bash
+docker compose down -v
+```
+Removes all containers, internal networks, and the `apartment_data` persistent volume.
 
 ---
 
-## 14. Checkpoint 1 Compliance Checklist
+## 16. Checkpoint Compliance Checklist
 
-| Checkpoint 1 Criteria | Implementation Evidence | How to Verify | Status |
+| Checkpoint Criteria | Implementation Evidence | How to Verify | Status |
 | :--- | :--- | :--- | :---: |
-| **Selected Project Case & First Users** | Apartment booking case with Marco the Host and Elena the Guest ([Section 2](#2-selected-project-case--first-users)). | Read Section 2. | ✅ |
-| **Domain Concept Map** | Mermaid class diagram of `Apartment`, `Booking`, `BookingStatus` and business rules ([Section 3](#3-domain-concept-map)); matches `app/models.py`. | Read Section 3. | ✅ |
-| **Running Application Implementing Stories** | All 4 user stories: US1 apartments CRUD, US2 booking lifecycle, US3 date range search, US4 overlap prevention ([Section 4](#4-user-stories--acceptance-criteria)). | `./scripts/demo.sh` (48 checks, steps 1–9 and 12). | ✅ |
-| **Automated Test Cases** | Unit, API integration, and end-to-end tests for every user story, run against an isolated in-memory database ([Section 12](#12-running-automated-tests--coverage)). | `pytest` | ✅ |
-| **Documented API Without GUI** | Swagger UI (`/docs`), ReDoc (`/redoc`), OpenAPI spec (`/openapi.json`) listing every endpoint. | Demo step 11, or open `/docs`. | ✅ |
-| **Persistent Storage Surviving Restarts** | SQLite file `./data/apartments.db` (WAL mode, foreign keys enforced). | Demo step 10 restarts the server automatically; manual steps in [Section 11](#11-verifying-data-persistence-across-server-restarts). | ✅ |
-| **Instructions to Start & Try Commands from the Terminal** | [Quickstart](#8-quickstart-guide-3-steps-to-run), one-command demo, and a copy-pasteable cURL walkthrough ([Section 10](#10--demonstrating-the-system-two-options)). | Follow Sections 8 and 10 in a terminal. | ✅ |
-
-All items above were re-verified on a fresh clone (new virtual environment, `pip install -r requirements.txt`, Quickstart, `./scripts/demo.sh`, `pytest`) before tagging the release `checkpoint-1`.
+| **Web Application with Forms for Existing Workflows** | Single-page responsive web app at `/` with forms for searching, booking, adding/editing apartments, and modifying/cancelling reservations ([Section 10](#10--interactive-web-application-forms--workflows)). | Open [http://localhost:8000](http://localhost:8000) in browser; run `tests/test_web_ui.py`. | ✅ |
+| **Resource-Oriented REST API** | Semantic URLs (`/apartments`, `/bookings`), standard HTTP methods (`GET`, `POST`, `PUT`, `DELETE`), clean JSON bodies, standard status codes (`200`, `201`, `204`, `400`, `404`, `409`, `422`) ([Section 11](#11--resource-oriented-rest-api--openapi-specification)). | Read Section 11; explore `/docs`. | ✅ |
+| **Documented OpenAPI Specification** | Enriched OpenAPI 3.1 documentation with parameters, realistic examples, and error schemas (`400`, `404`, `409`, `422`). Exported to `docs/openapi.json` and `docs/openapi.yaml`. | Open [http://localhost:8000/docs](http://localhost:8000/docs); run `tests/test_openapi.py`. | ✅ |
+| **Unit & Integration Tests for Key Rules** | 163 automated tests (98% branch coverage) testing date math, overlap formulas, cancellation release, deletion protection, and web UI. | Run `pytest -v` or `docker compose run --rm web pytest`. | ✅ |
+| **Persistent Docker Volumes for Databases** | Docker Compose configured with named volume `apartment_data:/app/data` backing SQLite ([Section 8](#8--docker-quickstart-fresh-checkout-commands), [Section 13](#13-verifying-persistent-storage-across-restarts--docker-volumes)). | Run `docker compose down` then `docker compose up -d` and inspect data. | ✅ |
+| **Verified Workflows Started with Docker Compose** | Multi-platform container based on `python:3.12-slim` with automated healthcheck and complete workflow support. | Run `docker compose up --build -d` and try web app or curl. | ✅ |
+| **Documented Exact Commands & Web Address** | Exact commands to start, stop, and test from a fresh checkout documented alongside web address `http://localhost:8000` ([Section 8](#8--docker-quickstart-fresh-checkout-commands)). | Follow Section 8 from a clean shell. | ✅ |
