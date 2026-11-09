@@ -1,0 +1,102 @@
+# Workflow 1: build the application, run the unit tests, build the Docker image
+# and run the tests again inside the image.
+name: Build & Unit Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit tests (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build check (application imports and API schema loads)
+        run: python -c "from app.main import app; print(len(app.openapi()['paths']), 'API paths')"
+
+      - name: Run unit tests
+        run: python -m pytest --no-cov --junitxml=reports/unit-tests.xml
+
+      - name: Show test results
+        if: always()
+        run: python scripts/ci_summary.py --junit reports/unit-tests.xml >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: reports/unit-tests.xml
+          if-no-files-found: warn
+
+  docker-image:
+    name: Docker image (build, tests in container, health check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build --tag apartment-booking:ci .
+
+      - name: Run unit tests inside the image
+        run: |
+          mkdir -p reports && chmod 777 reports
+          docker run --rm -v "$PWD/reports:/reports" apartment-booking:ci \
+            python -m pytest --no-cov -p no:cacheprovider --junitxml=/reports/docker-tests.xml
+
+      - name: Start container and check /health
+        run: |
+          docker run -d --name apartment-booking -p 8000:8000 apartment-booking:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health; then
+              echo
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs apartment-booking
+          exit 1
+
+      - name: Show image and test results
+        if: always()
+        run: |
+          {
+            echo "## 🐳 Docker image"
+            echo
+            echo "| Image | Size | Base |"
+            echo "| :--- | ---: | :--- |"
+            echo "| \`apartment-booking:ci\` | $(docker image inspect apartment-booking:ci --format '{{.Size}}' 2>/dev/null | awk '{printf "%.0f MB", $1/1000000}') | python:3.12-slim |"
+            echo
+            echo "Tests inside the container (the two demo-script tests are skipped because the slim image has no curl):"
+            echo
+            python3 scripts/ci_summary.py --junit reports/docker-tests.xml
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f apartment-booking || true
