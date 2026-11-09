@@ -863,18 +863,9 @@ The same checks are defined for GitLab in [`.gitlab-ci.yml`](.gitlab-ci.yml):
 | Job | Stage | Same as |
 | :--- | :--- | :--- |
 | `unit-tests` | test | Build & Unit Tests (tests) |
-| `docker-image` | build | Build & Unit Tests (Docker image) |
+| `docker-image` | build | Build & Unit Tests (Docker image, built with Kaniko) |
 | `coverage-check` | quality | Coverage Gate |
 
 1. In the university GitLab: **New project → Import project → Repository by URL**, URL `https://github.com/rmnfdrzq/apartment-booking.git`.
 2. The pipeline starts by itself; open **Build → Pipelines**. Test results are in the pipeline's **Tests** tab, coverage is shown on the `coverage-check` job.
-3. If `docker-image` fails with a message about `privileged` mode or connecting to `docker:2375`, the university runner does not allow Docker-in-Docker. Replace the job with Kaniko, which needs no privileges:
-   ```yaml
-   docker-image:
-     stage: build
-     image:
-       name: gcr.io/kaniko-project/executor:v1.23.2-debug
-       entrypoint: [""]
-     script:
-       - /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile "$CI_PROJECT_DIR/Dockerfile" --no-push
-   ```
+3. The university shared runners do not allow privileged Docker-in-Docker, so `docker-image` builds the image with **Kaniko** from the same `Dockerfile` (no Docker daemon needed). Running the tests inside the container and the `/health` check are done in the GitHub workflow, where Docker is available.

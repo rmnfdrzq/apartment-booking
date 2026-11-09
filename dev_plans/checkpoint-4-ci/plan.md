@@ -88,7 +88,7 @@ Run the project's checks automatically on every push and pull request (merge req
 ### Risk 2: University GitLab Runner Without Privileged Docker
 - **Context:** Docker-in-Docker needs `privileged = true` on the runner; shared university runners may not allow it.
 - **Severity:** Medium (only the Docker build job is affected).
-- **Mitigation:** The job is isolated in its own stage; an alternative Kaniko job (no privileges needed) is documented in the README section for GitLab.
+- **Outcome (verified on gitlab.inf.unibz.it):** the shared runner refused privileged mode (`mount: permission denied`), so the Docker-in-Docker service never started. `docker-image` now builds the image with Kaniko, which needs no privileges; tests inside the container and the `/health` check stay in the GitHub workflow.
 
 ### Risk 3: Coverage Threshold Too Strict
 - **Context:** Future features may lower coverage temporarily.
