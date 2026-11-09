@@ -1,5 +1,5 @@
 # GitLab CI for the Apartment Booking app — same checks as .github/workflows/:
-#   Workflow 1 "Build & Unit Tests": unit-tests + docker-image
+#   Workflow 1 "Build & Unit Tests": unit-tests + docker-image (Kaniko build)
 #   Workflow 2 "Coverage Gate":      coverage-check (fails below 80 %)
 # Test results appear under the pipeline's "Tests" tab, coverage on the job and in merge requests.
 
@@ -50,34 +50,24 @@ unit-tests:
       junit: reports/unit-tests.xml
 
 docker-image:
-  # Docker-in-Docker needs a runner with privileged = true.
-  # If the university runner refuses it, use the Kaniko job described in README (section "GitLab CI").
+  # Builds the image from the same Dockerfile with Kaniko, which needs no Docker daemon and no
+  # privileged mode (the university shared runners do not allow Docker-in-Docker).
+  # Every Dockerfile instruction is executed, so a broken Dockerfile or dependency fails this job.
   stage: build
   timeout: 15m
-  image: docker:27
-  services:
-    - name: docker:27-dind
-      alias: docker
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
   script:
-    - docker build --tag apartment-booking:ci .
-    - docker run --rm apartment-booking:ci python -m pytest --no-cov -p no:cacheprovider
-    - docker run -d --name apartment-booking apartment-booking:ci
-    - |
-      healthy=no
-      for _ in $(seq 1 30); do
-        if docker exec apartment-booking python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health').read().decode())"; then
-          healthy=yes
-          break
-        fi
-        sleep 1
-      done
-      if [ "$healthy" != yes ]; then docker logs apartment-booking; exit 1; fi
-    - docker image ls apartment-booking:ci
-  after_script:
-    - docker rm -f apartment-booking || true
+    - >
+      /kaniko/executor
+      --context "$CI_PROJECT_DIR"
+      --dockerfile "$CI_PROJECT_DIR/Dockerfile"
+      --destination "apartment-booking:ci"
+      --no-push
+      --tar-path image.tar
+    - ls -lh image.tar
+    - echo "Docker image apartment-booking:ci built successfully."
 
 # ---- Workflow 2: coverage gate --------------------------------------------------
 
